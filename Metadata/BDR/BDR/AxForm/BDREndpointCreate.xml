@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDREndpointCreate</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDREndpointCreate extends FormRun
+{
+    BDREnvironment environment;
+    RecId editRecId;
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        Common record = element.args() ? element.args().record() : null;
+
+        if (record && record.TableId == tableNum(BDREnvironment))
+        {
+            environment = record;
+        }
+        else if (record && record.TableId == tableNum(BDREndpoint))
+        {
+            BDREndpoint endpoint = record;
+
+            editRecId = endpoint.RecId;
+            environment = BDREnvironment::find(endpoint.EnvironmentId);
+        }
+
+        if (!environment.RecId)
+        {
+            throw error("@BDR:ErrOpenFromEnvironment");
+        }
+
+        super();
+
+        element.design().caption(strFmt('%1: %2', element.design().caption(), environment.EnvironmentId));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run()
+    {
+        super();
+
+        // Same endpoint types as Microsoft's BusinessEventsEndpointConfiguration form.
+        EndpointTypeSelection.delete(enum2Str(BusinessEventsEndpointType::CDS));
+        EndpointTypeSelection.delete(enum2Str(BusinessEventsEndpointType::Flow));
+        EndpointTypeSelection.delete(enum2Str(BusinessEventsEndpointType::FICAzureEndpoint));
+
+        if (editRecId)
+        {
+            element.showEndpointFields();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>showEndpointFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Second step: the fields of the chosen endpoint type.
+    /// </summary>
+    public void showEndpointFields()
+    {
+        SelectTypeGroup.visible(false);
+        EndpointFieldsGroup.visible(true);
+        NextButton.visible(false);
+        OkButton.visible(true);
+        element.updateEndpointFields();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateEndpointFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Shows only the connection fields the endpoint type uses.
+    /// </summary>
+    public void updateEndpointFields()
+    {
+        BusinessEventsEndpointType endpointType = BDREndpoint.EndpointType;
+        boolean isServiceBus = endpointType == BusinessEventsEndpointType::AzureServiceBusQueue
+            || endpointType == BusinessEventsEndpointType::AzureServiceBusTopic;
+        boolean hasResource = isServiceBus
+            || endpointType == BusinessEventsEndpointType::AzureEventHub
+            || endpointType == BusinessEventsEndpointType::AzureBlobStorage;
+
+        BDREndpoint_ds.object(fieldNum(BDREndpoint, ResourceName)).visible(hasResource);
+        BDREndpoint_ds.object(fieldNum(BDREndpoint, EndpointUrl)).visible(endpointType == BusinessEventsEndpointType::AzureEventGrid);
+        BDREndpoint_ds.object(fieldNum(BDREndpoint, ServiceBusSku)).visible(isServiceBus);
+        BDREndpoint_ds.object(fieldNum(BDREndpoint, EventHubSku)).visible(endpointType == BusinessEventsEndpointType::AzureEventHub);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDREndpoint</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            QueryBuildDataSource queryBuildDataSource = this.queryBuildDataSource();
+            QueryBuildRange environmentRange = queryBuildDataSource.addRange(fieldNum(BDREndpoint, EnvironmentId));
+            QueryBuildRange recordRange = queryBuildDataSource.addRange(fieldNum(BDREndpoint, RecId));
+
+            environmentRange.value(queryValue(environment.EnvironmentId));
+            environmentRange.status(RangeStatus::Locked);
+
+            // Edit shows the endpoint; a new endpoint starts without a record.
+            recordRange.value(queryValue(editRecId));
+            recordRange.status(RangeStatus::Locked);
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            BDREndpoint.EnvironmentId = environment.EnvironmentId;
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>validateWrite</Name>
+						<Source><![CDATA[
+        public boolean validateWrite()
+        {
+            boolean ret = super();
+
+            // Like Microsoft's endpoint setup: a new endpoint, or a changed connection, must send a test event.
+            if (ret && BDREndpoint.connectionChanged())
+            {
+                ret = BDREndpoint.validateConnection(ValidationSecret.valueStr());
+            }
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>NextButton</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            BusinessEventsEndpointType endpointType = any2Enum(EndpointTypeSelection.selection());
+
+            super();
+
+            BDREndpoint_ds.create();
+            BDREndpoint.EndpointType = endpointType;
+            element.showEndpointFields();
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>OkButton</Name>
+				<Type>CommandButton</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            RecId endpointRecId;
+            FormRun callerForm = element.args().caller() as FormRun;
+
+            super();
+
+            endpointRecId = BDREndpoint.RecId;
+
+            // Show the endpoint in the grid of the caller.
+            if (endpointRecId && callerForm && formHasMethod(callerForm, identifierStr(setEndpointRecId)))
+            {
+                Object caller = callerForm;
+                caller.setEndpointRecId(endpointRecId);
+            }
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDREndpoint</Name>
+			<Table>BDREndpoint</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:EndpointDialogCaption</Caption>
+		<DataSource xmlns="">BDREndpoint</DataSource>
+		<Pattern xmlns="">Dialog</Pattern>
+		<PatternVersion xmlns="">1.2</PatternVersion>
+		<Style xmlns="">Dialog</Style>
+		<TitleDataSource xmlns="">BDREndpoint</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>DialogContent</Name>
+				<HeightMode>SizeToAvailable</HeightMode>
+				<Pattern>Custom</Pattern>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormGroupControl">
+						<Name>SelectTypeGroup</Name>
+						<AutoDeclaration>Yes</AutoDeclaration>
+						<Type>Group</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormComboBoxControl">
+								<Name>EndpointTypeSelection</Name>
+								<AutoDeclaration>Yes</AutoDeclaration>
+								<Type>ComboBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<EnumType>BusinessEventsEndpointType</EnumType>
+								<Items />
+								<Label>@BDR:EndpointTypeLabel</Label>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStaticTextControl">
+								<Name>SelectTypeInstruction</Name>
+								<Type>StaticText</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Text>@BDR:SelectEndpointTypeInstruction</Text>
+							</AxFormControl>
+						</Controls>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormGroupControl">
+						<Name>EndpointFieldsGroup</Name>
+						<AutoDeclaration>Yes</AutoDeclaration>
+						<Type>Group</Type>
+						<Visible>No</Visible>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormGroupControl">
+								<Name>CommonFields</Name>
+								<Type>Group</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Controls>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>CommonFields_EndpointName</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>EndpointName</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormComboBoxControl">
+										<Name>CommonFields_EndpointType</Name>
+								<AllowEdit>No</AllowEdit>
+										<Type>ComboBox</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>EndpointType</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>CommonFields_Description</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>Description</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormCheckBoxControl">
+										<Name>CommonFields_AllCompanies</Name>
+										<Type>CheckBox</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>AllCompanies</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+								</Controls>
+								<Caption>@BDR:EndpointDialogCaption</Caption>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormGroupControl">
+								<Name>Connection</Name>
+								<Type>Group</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Controls>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Connection_ResourceName</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>ResourceName</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Connection_EndpointUrl</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>EndpointUrl</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormComboBoxControl">
+										<Name>Connection_ServiceBusSku</Name>
+										<Type>ComboBox</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>ServiceBusSku</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormComboBoxControl">
+										<Name>Connection_EventHubSku</Name>
+										<Type>ComboBox</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>EventHubSku</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormCheckBoxControl">
+										<Name>Connection_ValidateConnection</Name>
+										<Type>CheckBox</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>ValidateConnection</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+								</Controls>
+								<Caption>@BDR:Connection</Caption>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormGroupControl">
+								<Name>Authentication</Name>
+								<Type>Group</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Controls>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Authentication_AzureAppId</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>AzureAppId</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Authentication_KeyVaultDnsName</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>KeyVaultDnsName</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Authentication_KeyVaultSecretName</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>KeyVaultSecretName</DataField>
+										<DataSource>BDREndpoint</DataSource>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>Authentication_SecretName</Name>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<DataField>SecretName</DataField>
+										<DataSource>BDREndpoint</DataSource>
+										<Label>@BDR:ClientSecretName</Label>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormStringControl">
+										<Name>ValidationSecret</Name>
+										<AutoDeclaration>Yes</AutoDeclaration>
+										<HelpText>@BDR:ValidationSecretHelp</HelpText>
+										<Type>String</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<Label>@BDR:ValidationSecret</Label>
+										<PasswordStyle>Yes</PasswordStyle>
+									</AxFormControl>
+								</Controls>
+								<Caption>@BDR:Authentication</Caption>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+						</Controls>
+					</AxFormControl>
+				</Controls>
+				<Style>DialogContent</Style>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormButtonGroupControl">
+				<Name>DialogButtons</Name>
+				<Type>ButtonGroup</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormCommandButtonControl">
+						<Name>OkButton</Name>
+						<AutoDeclaration>Yes</AutoDeclaration>
+						<Type>CommandButton</Type>
+						<Visible>No</Visible>
+						<FormControlExtension
+							i:nil="true" />
+						<Command>OK</Command>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonControl">
+						<Name>NextButton</Name>
+						<AutoDeclaration>Yes</AutoDeclaration>
+						<Type>Button</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Text>@BDR:Next</Text>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCommandButtonControl">
+						<Name>CancelButton</Name>
+						<Type>CommandButton</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Command>Cancel</Command>
+						<SaveRecord>No</SaveRecord>
+					</AxFormControl>
+				</Controls>
+				<ArrangeMethod>HorizontalRight</ArrangeMethod>
+				<DataSource>BDREndpoint</DataSource>
+				<Style>DialogCommitContainer</Style>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

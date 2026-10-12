@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxSecurityPrivilege xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServiceInvoke</Name>
+	<Description>@BDR:ServicePrivilege</Description>
+	<Label>@BDR:ServicePrivilege</Label>
+	<DirectAccessPermissions />
+	<EntryPoints>
+		<AxSecurityEntryPointReference>
+			<Name>BDRServicerun</Name>
+			<Grant>
+				<Invoke>Allow</Invoke>
+			</Grant>
+			<ObjectChildName>run</ObjectChildName>
+			<ObjectName>BDRService</ObjectName>
+			<ObjectType>ServiceOperation</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRServicegetJobStatus</Name>
+			<Grant>
+				<Invoke>Allow</Invoke>
+			</Grant>
+			<ObjectChildName>getJobStatus</ObjectChildName>
+			<ObjectName>BDRService</ObjectName>
+			<ObjectType>ServiceOperation</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+	</EntryPoints>
+	<FormControlOverrides />
+</AxSecurityPrivilege>

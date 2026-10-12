@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobContract</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Parameters of a database refresh job started from the menu or in batch.
+/// </summary>
+[DataContractAttribute,
+ SysOperationContractProcessingAttribute(classStr(BDRJobUIBuilder))]
+public final class BDRJobContract
+{
+    private BDREnvironmentId environmentId;
+    private RefRecId continueJobRecId;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The environment configured for the current instance.
+    /// </summary>
+    [DataMemberAttribute('EnvironmentId'),
+     SysOperationLabelAttribute(literalStr("@BDR:Environment")),
+     SysOperationHelpTextAttribute(literalStr("@BDR:RunCurrentEnvironmentHelp"))]
+    public BDREnvironmentId parmEnvironmentId(BDREnvironmentId _environmentId = environmentId)
+    {
+        environmentId = _environmentId;
+        return environmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmContinueJobRecId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Set when a batch job continues the tasks a service call scheduled.
+    /// </summary>
+    [DataMemberAttribute('ContinueJobRecId'),
+     SysOperationControlVisibilityAttribute(false)]
+    public RefRecId parmContinueJobRecId(RefRecId _continueJobRecId = continueJobRecId)
+    {
+        continueJobRecId = _continueJobRecId;
+        return continueJobRecId;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

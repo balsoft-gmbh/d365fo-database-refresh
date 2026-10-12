@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEnum xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRMessageType</Name>
+	<Label>@BDR:MessageType</Label>
+	<UseEnumValue>Yes</UseEnumValue>
+	<EnumValues>
+		<AxEnumValue>
+			<Name>Info</Name>
+			<Label>@BDR:TypeInfo</Label>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Warning</Name>
+			<Label>@BDR:TypeWarning</Label>
+			<Value>1</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Error</Name>
+			<Label>@BDR:TypeError</Label>
+			<Value>2</Value>
+		</AxEnumValue>
+	</EnumValues>
+</AxEnum>

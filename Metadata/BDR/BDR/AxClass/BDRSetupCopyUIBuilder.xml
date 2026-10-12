@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRSetupCopyUIBuilder</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Dialog of Copy setup: lookup for the target environment.
+/// </summary>
+public final class BDRSetupCopyUIBuilder extends SysOperationAutomaticUIBuilder
+{
+    private DialogField targetEnvironmentField;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>postBuild</Name>
+				<Source><![CDATA[
+
+    public void postBuild()
+    {
+        BDRSetupCopyContract contract = this.dataContractObject() as BDRSetupCopyContract;
+
+        super();
+
+        targetEnvironmentField = this.bindInfo().getDialogField(contract, methodStr(BDRSetupCopyContract, parmTargetEnvironmentId));
+
+        targetEnvironmentField.registerOverrideMethod(methodStr(FormStringControl, lookup), methodStr(BDRSetupCopyUIBuilder, lookupEnvironment), this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupEnvironment</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lists the environments by code and mode.
+    /// </summary>
+    public void lookupEnvironment(FormStringControl _control)
+    {
+        SysTableLookup lookup = SysTableLookup::newParameters(tableNum(BDREnvironment), _control);
+        Query query = new Query();
+
+        query.addDataSource(tableNum(BDREnvironment)).addSortField(fieldNum(BDREnvironment, EnvironmentId));
+
+        lookup.addLookupfield(fieldNum(BDREnvironment, EnvironmentId), true);
+        lookup.addLookupfield(fieldNum(BDREnvironment, EnvironmentMode));
+        lookup.parmQuery(query);
+        lookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

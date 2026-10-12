@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDRWorkflowCancel</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDRWorkflowCancel extends FormRun
+{
+    BDREnvironment environment;
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        if (element.args() && element.args().record() && element.args().record().TableId == tableNum(BDREnvironment))
+        {
+            environment = element.args().record();
+        }
+
+        if (!environment.RecId)
+        {
+            throw error("@BDR:ErrOpenFromEnvironment");
+        }
+
+        super();
+
+        element.design().caption(strFmt('%1: %2', element.design().caption(), environment.EnvironmentId));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateCompanies</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Companies can be chosen when the row is saved and not for all companies.
+    /// </summary>
+    public void updateCompanies()
+    {
+        boolean canChoose = BDRWorkflowCancel.canChooseCompanies();
+
+        BDRWorkflowCancel_ds.object(fieldNum(BDRWorkflowCancel, AllCompanies)).allowEdit(canChoose);
+        Companies.enabled(canChoose && BDRWorkflowCancel.RecId && !BDRWorkflowCancel.AllCompanies);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDRWorkflowCancel</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                QueryBuildRange range = this.queryBuildDataSource().addRange(fieldNum(BDRWorkflowCancel, EnvironmentId));
+                range.value(queryValue(environment.EnvironmentId));
+                range.status(RangeStatus::Locked);
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                BDRWorkflowCancel.EnvironmentId = environment.EnvironmentId;
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>Grid_AllCompanies</Name>
+				<Type>CheckBox</Type>
+				<Methods>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            // Save at once: All companies removes the selected companies and enables Companies.
+            BDRWorkflowCancel_ds.write();
+            BDRWorkflowCancel_ds.refresh();
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDRWorkflowCancel</Name>
+			<Table>BDRWorkflowCancel</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:WorkflowsToCancel</Caption>
+		<DataSource xmlns="">BDRWorkflowCancel</DataSource>
+		<Pattern xmlns="">SimpleList</Pattern>
+		<PatternVersion xmlns="">1.1</PatternVersion>
+		<Style xmlns="">SimpleList</Style>
+		<TitleDataSource xmlns="">BDRWorkflowCancel</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormActionPaneControl">
+				<Name>ActionPane</Name>
+				<Type>ActionPane</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonGroupControl">
+						<Name>RowGroup</Name>
+						<Type>ButtonGroup</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>Companies</Name>
+								<AutoDeclaration>Yes</AutoDeclaration>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataSource>BDRWorkflowCancel</DataSource>
+								<MenuItemName>BDRSetupCompany</MenuItemName>
+								<NeedsRecord>Yes</NeedsRecord>
+								<Text>@BDR:SetupCompanies</Text>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDRWorkflowCancel</DataSource>
+					</AxFormControl>
+				</Controls>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>FilterGroup</Name>
+				<Pattern>CustomAndQuickFilters</Pattern>
+				<PatternVersion>1.1</PatternVersion>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl>
+						<Name>QuickFilter</Name>
+						<FormControlExtension>
+							<Name>QuickFilterControl</Name>
+							<ExtensionComponents />
+							<ExtensionProperties>
+								<AxFormControlExtensionProperty>
+									<Name>targetControlName</Name>
+									<Type>String</Type>
+									<Value>Grid</Value>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>defaultColumnName</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>placeholderText</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+							</ExtensionProperties>
+						</FormControlExtension>
+					</AxFormControl>
+				</Controls>
+				<ArrangeMethod>HorizontalLeft</ArrangeMethod>
+				<FrameType>None</FrameType>
+				<Style>CustomFilter</Style>
+				<ViewEditMode>Edit</ViewEditMode>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGridControl">
+				<Name>Grid</Name>
+				<Type>Grid</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_ConfigurationName</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>ConfigurationName</DataField>
+						<DataSource>BDRWorkflowCancel</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>Grid_AllCompanies</Name>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>AllCompanies</DataField>
+						<DataSource>BDRWorkflowCancel</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_companyScope</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataMethod>companyScope</DataMethod>
+						<DataSource>BDRWorkflowCancel</DataSource>
+						<Label>@BDR:SelectedCompanies</Label>
+					</AxFormControl>
+				</Controls>
+				<DataSource>BDRWorkflowCancel</DataSource>
+				<Style>Tabular</Style>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

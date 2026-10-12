@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDREnvironment</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// An environment that receives copies, identified by its Power Platform or LCS environment ID
+/// like <c>SysEnvironmentModeMap</c>.
+/// </summary>
+public class BDREnvironment extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>find</Name>
+				<Source><![CDATA[
+
+    public static BDREnvironment find(BDREnvironmentId _environmentId, boolean _forUpdate = false)
+    {
+        BDREnvironment environment;
+
+        if (_environmentId)
+        {
+            environment.selectForUpdate(_forUpdate);
+
+            select firstonly environment
+                where environment.EnvironmentId == _environmentId;
+        }
+
+        return environment;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>findBySysEnvironmentId</Name>
+				<Source><![CDATA[
+
+    public static BDREnvironment findBySysEnvironmentId(SysEnvironmentid _sysEnvironmentId)
+    {
+        BDREnvironment environment;
+
+        if (_sysEnvironmentId)
+        {
+            select firstonly environment
+                where environment.SysEnvironmentId == _sysEnvironmentId;
+        }
+
+        return environment;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>exist</Name>
+				<Source><![CDATA[
+
+    public static boolean exist(BDREnvironmentId _environmentId)
+    {
+        return _environmentId && (select firstonly RecId from BDREnvironment
+            where BDREnvironment.EnvironmentId == _environmentId).RecId != 0;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isCurrent</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Shows whether this environment is the instance the user is working in.
+    /// </summary>
+    public display NoYes isCurrent()
+    {
+        return BDREnvironmentResolver::isCurrent(this.SysEnvironmentId) ? NoYes::Yes : NoYes::No;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>modifiedField</Name>
+				<Source><![CDATA[
+
+    public void modifiedField(FieldId _fieldId)
+    {
+        super(_fieldId);
+
+        if (_fieldId == fieldNum(BDREnvironment, SysEnvironmentId))
+        {
+            this.SysEnvironmentId = strLwr(strLRTrim(this.SysEnvironmentId));
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>addAllTaskTypes</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Adds every enabled task type that is not yet part of the environment, inactive, with its default sequence.
+    /// </summary>
+    public void addAllTaskTypes()
+    {
+        BDRTaskType taskType;
+        BDREnvironmentTask environmentTask;
+
+        if (!this.EnvironmentId)
+        {
+            return;
+        }
+
+        ttsbegin;
+
+        while select taskType
+            where taskType.IsEnabled == NoYes::Yes
+            notexists join environmentTask
+                where environmentTask.EnvironmentId == this.EnvironmentId
+                    && environmentTask.TaskTypeName == taskType.Name
+        {
+            BDREnvironmentTask newTask;
+
+            newTask.EnvironmentId = this.EnvironmentId;
+            newTask.TaskTypeName = taskType.Name;
+            newTask.Sequence = taskType.DefaultSequence;
+            newTask.IsActive = NoYes::No;
+            newTask.insert();
+        }
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:Environment</DeveloperDocumentation>
+	<Label>@BDR:Environment</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>EnvironmentId</TitleField1>
+	<TitleField2>EnvironmentMode</TitleField2>
+	<CacheLookup>Found</CacheLookup>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentIdIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentIdIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentIdIdx</PrimaryIndex>
+	<DeleteActions>
+		<AxTableDeleteAction>
+			<Name>BDREnvironmentTask</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDREnvironmentTask</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRFieldValue</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRFieldValue</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRUserRole</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRUserRole</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRUserToEnable</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRUserToEnable</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRWorkflowCancel</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRWorkflowCancel</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRBatchJob</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRBatchJob</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDREndpoint</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDREndpoint</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDREndpointEvent</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDREndpointEvent</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRCleanupRule</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRCleanupRule</Table>
+		</AxTableDeleteAction>
+	</DeleteActions>
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>SysEnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentMode</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentMode</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>SysEnvironmentId</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>SysEnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentMode</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<AllowEdit>No</AllowEdit>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>SysEnvironmentId</Name>
+			<ExtendedDataType>SysEnvironmentid</ExtendedDataType>
+			<HelpText>@BDR:SysEnvironmentIdHelp</HelpText>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>EnvironmentMode</Name>
+			<HelpText>@BDR:EnvironmentModeHelp</HelpText>
+			<EnumType>EnvironmentMode</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentIdIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+		<AxTableIndex>
+			<Name>SysEnvironmentIdIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>SysEnvironmentId</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+	</Relations>
+	<StateMachines />
+</AxTable>

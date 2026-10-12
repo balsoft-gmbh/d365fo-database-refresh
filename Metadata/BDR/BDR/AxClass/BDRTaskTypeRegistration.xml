@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeRegistration</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Registers all task types found through <c>SysPluginFactory</c> in <c>BDRTaskType</c>,
+/// following <c>ArchiveServiceTypeRegistration</c>.
+/// </summary>
+public final class BDRTaskTypeRegistration
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+
+    public static void main(Args _args)
+    {
+        BDRTaskTypeRegistration::registerTypes();
+
+        info("@BDR:RegisterTaskTypesDone");
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>registerTypes</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Inserts or updates a <c>BDRTaskType</c> record for every task type plugin and disables
+    /// task types whose class no longer exists.
+    /// </summary>
+    public static void registerTypes()
+    {
+        SysPluginMetadataCollection metadataCollection = new SysPluginMetadataCollection();
+        Set registeredNames = new Set(Types::String);
+
+        var taskTypeProviders = SysPluginFactory::Instances(
+            identifierStr(Dynamics.AX.Application),
+            classStr(BDRITaskType),
+            metadataCollection);
+
+        ttsbegin;
+
+        for (int counter = 1; counter <= taskTypeProviders.lastIndex(); counter++)
+        {
+            BDRITaskType taskType = taskTypeProviders.value(counter) as BDRITaskType;
+
+            if (taskType)
+            {
+                BDRTaskTypeRegistrationItem item = taskType.registration();
+
+                if (item && item.parmName())
+                {
+                    BDRTaskType::register(item, classId2Name(classIdGet(taskType)));
+                    registeredNames.add(item.parmName());
+                }
+            }
+        }
+
+        BDRTaskType type;
+
+        while select forupdate type
+            where type.IsEnabled == NoYes::Yes
+        {
+            if (!registeredNames.in(type.Name))
+            {
+                type.IsEnabled = NoYes::No;
+                type.update();
+            }
+        }
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>registerTypesIfEmpty</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Registers the task types once, when none are registered yet.
+    /// </summary>
+    public static void registerTypesIfEmpty()
+    {
+        BDRTaskType taskType;
+
+        select firstonly RecId from taskType;
+
+        if (!taskType.RecId)
+        {
+            BDRTaskTypeRegistration::registerTypes();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getTaskType</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the plugin instance for a task type name.
+    /// </summary>
+    /// <param name = "_name">The task type name.</param>
+    /// <returns>The task type, or null if no plugin with this name exists.</returns>
+    public static BDRITaskType getTaskType(BDRTaskTypeName _name)
+    {
+        SysPluginMetadataCollection metadataCollection = new SysPluginMetadataCollection();
+
+        metadataCollection.SetManagedValue(classStr(BDRITaskType), _name);
+
+        return SysPluginFactory::Instance(
+            identifierStr(Dynamics.AX.Application),
+            classStr(BDRITaskType),
+            metadataCollection) as BDRITaskType;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDREnvironmentTask</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// The tasks that run for an environment, in sequence.
+/// </summary>
+public class BDREnvironmentTask extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.IsActive = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>modifiedField</Name>
+				<Source><![CDATA[
+
+    public void modifiedField(FieldId _fieldId)
+    {
+        super(_fieldId);
+
+        if (_fieldId == fieldNum(BDREnvironmentTask, TaskTypeName) && !this.Sequence)
+        {
+            this.Sequence = BDRTaskType::find(this.TaskTypeName).DefaultSequence;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>taskLabel</Name>
+				<Source><![CDATA[
+
+    public display Description taskLabel()
+    {
+        return BDRTaskType::find(this.TaskTypeName).taskLabel();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteOrphans</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes tasks whose environment no longer exists, for example after the environment code was changed.
+    /// </summary>
+    public static void deleteOrphans()
+    {
+        BDREnvironmentTask environmentTask;
+        BDREnvironment environment;
+
+        ttsbegin;
+
+        delete_from environmentTask
+            notexists join environment
+                where environment.EnvironmentId == environmentTask.EnvironmentId;
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:EnvironmentTasks</DeveloperDocumentation>
+	<Label>@BDR:EnvironmentTasks</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>EnvironmentId</TitleField1>
+	<TitleField2>TaskTypeName</TitleField2>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentTaskIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentTaskIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentTaskIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TaskTypeName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Sequence</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>IsActive</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>Sequence</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TaskTypeName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>IsActive</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>TaskTypeName</Name>
+			<ExtendedDataType>BDRTaskTypeName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt">
+			<Name>Sequence</Name>
+			<ExtendedDataType>BDRSequence</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>IsActive</Name>
+			<Label>@BDR:IsActive</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentTaskIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>TaskTypeName</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+		<AxTableRelation>
+			<Name>TaskType</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDRTaskType</RelatedTable>
+			<RelatedTableCardinality>ZeroOne</RelatedTableCardinality>
+			<RelationshipType>Association</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>TaskTypeName</Name>
+					<Field>TaskTypeName</Field>
+					<RelatedField>Name</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

@@ -1,0 +1,121 @@
+# Copy an environment and prepare the copy with Database refresh (sample).
+#
+# Stage Copy copies the source environment (for example production) over the target sandbox with the
+# Power Platform Build Tools. Stage Refresh then calls the BDR service on the target through
+# Pipelines/scripts/Invoke-DatabaseRefresh.ps1: it waits until Finance and Operations answers, runs the
+# active Database refresh tasks of the environment, waits for tasks that continue in batch and fails the
+# pipeline if the job did not succeed.
+#
+# Before the first run:
+# - Install "Power Platform Build Tools" from the Visual Studio Marketplace.
+# - Create a Power Platform service connection (service principal) for the SOURCE environment and put
+#   its name in SourceConnection. The service principal must be allowed to copy environments.
+# - Create a variable group named DatabaseRefresh with TenantId, ClientId and ClientSecret (secret) of an
+#   Entra ID application that is registered in the TARGET Finance and Operations environment
+#   (System administration > Setup > Microsoft Entra ID applications) with a user that has the role
+#   Database refresh administrator, plus one secret variable for every secret your setup names (here
+#   ServiceBusAppSecret). Better: link the group to an Azure Key Vault.
+# - Create an Azure DevOps environment with the name in TargetName and add an approval on it, so nobody
+#   overwrites the sandbox by accident.
+# - Set up the target in Database refresh > Setup > Environments of the SOURCE environment. The setup is
+#   copied with the database.
+#
+# A copy of a Finance and Operations environment can take several hours. A job on a Microsoft-hosted
+# agent stops after 6 hours. For longer copies use a self-hosted agent, or start the copy in the Power
+# Platform admin center and run this pipeline with skipCopy = true afterwards. For an LCS environment,
+# replace the Copy stage with a refresh through the LCS Database Movement API.
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger: none
+pr: none
+
+# A weekly refresh, for example every Sunday at 01:00 UTC:
+# schedules:
+#   - cron: '0 1 * * 0'
+#     displayName: Weekly UAT refresh
+#     branches:
+#       include: [ main ]
+#     always: true
+
+parameters:
+  - name: copyType
+    displayName: Copy type
+    type: string
+    default: FullCopy
+    values: [ FullCopy, MinimalCopy ]
+  - name: skipCopy
+    displayName: Skip the copy and only run Database refresh
+    type: boolean
+    default: false
+
+variables:
+  - group: DatabaseRefresh
+  - name: SourceConnection
+    value: 'CONTOSO-PROD'                                            # service connection of the source
+  - name: TargetName
+    value: 'CONTOSO-UAT'                                             # Azure DevOps environment (approval)
+  - name: TargetEnvironmentUrl
+    value: 'https://contoso-uat.crm4.dynamics.com'                   # Dataverse URL of the target
+  - name: TargetFinOpsUrl
+    value: 'https://contoso-uat.sandbox.operations.eu.dynamics.com'  # Finance and Operations URL of the target
+  - name: DatabaseRefreshEnvironment
+    value: 'UAT'                                                     # environment code in Database refresh
+
+pool:
+  vmImage: 'windows-latest'
+
+stages:
+  - ${{ if eq(parameters.skipCopy, false) }}:
+    - stage: Copy
+      displayName: 'Copy environment'
+      jobs:
+        - deployment: copy
+          displayName: 'Copy source over target'
+          environment: ${{ variables.TargetName }}
+          timeoutInMinutes: 360
+          strategy:
+            runOnce:
+              deploy:
+                steps:
+                  - task: PowerPlatformToolInstaller@2
+                    displayName: 'Power Platform Tool Installer'
+                    inputs:
+                      DefaultVersion: true
+
+                  - task: PowerPlatformCopyEnvironment@2
+                    displayName: 'Copy environment (${{ parameters.copyType }})'
+                    inputs:
+                      authenticationType: 'PowerPlatformSPN'
+                      PowerPlatformSPN: '$(SourceConnection)'
+                      TargetEnvironmentUrl: '$(TargetEnvironmentUrl)'
+                      CopyType: '${{ parameters.copyType }}'
+                      SkipAuditData: true
+                      MaxAsyncWaitTime: '350'
+
+  - stage: Refresh
+    displayName: 'Database refresh'
+    ${{ if eq(parameters.skipCopy, false) }}:
+      dependsOn: Copy
+    jobs:
+      - job: refresh
+        displayName: 'Run Database refresh tasks'
+        timeoutInMinutes: 300
+        steps:
+          - checkout: self
+
+          - task: PowerShell@2
+            displayName: 'Run Database refresh on $(DatabaseRefreshEnvironment)'
+            inputs:
+              pwsh: true
+              filePath: 'Pipelines/scripts/Invoke-DatabaseRefresh.ps1'
+              arguments: >-
+                -FinOpsUrl '$(TargetFinOpsUrl)'
+                -TenantId '$(TenantId)'
+                -ClientId '$(ClientId)'
+                -EnvironmentId '$(DatabaseRefreshEnvironment)'
+                -SecretNames ServiceBusAppSecret
+                -RequestId '$(Build.BuildId)'
+            env:
+              BDR_CLIENT_SECRET: $(ClientSecret)
+              BDR_SECRET_ServiceBusAppSecret: $(ServiceBusAppSecret)

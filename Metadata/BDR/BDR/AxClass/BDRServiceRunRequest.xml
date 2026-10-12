@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServiceRunRequest</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Request of the run operation.
+/// </summary>
+/// <example>
+/// { "_request": { "EnvironmentId": "UAT", "TaskTypeNames": [], "RequestId": "pipeline-4711",
+///   "RunInBatch": false, "ReturnResultOnFailure": false,
+///   "Secrets": [ { "Name": "ServiceBusAppSecret", "Value": "..." } ] } }
+/// </example>
+[DataContractAttribute]
+public final class BDRServiceRunRequest
+{
+    private BDREnvironmentId environmentId;
+    private List taskTypeNames;
+    private List secrets;
+    private BDRRequestId requestId;
+    private boolean runInBatch;
+    private boolean returnResultOnFailure;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The environment; empty to find it by the host name of this instance.
+    /// </summary>
+    [DataMemberAttribute('EnvironmentId')]
+    public BDREnvironmentId parmEnvironmentId(BDREnvironmentId _environmentId = environmentId)
+    {
+        environmentId = _environmentId;
+        return environmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmTaskTypeNames</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Task type names to run; empty for all active tasks of the environment.
+    /// </summary>
+    [DataMemberAttribute('TaskTypeNames'),
+     AifCollectionTypeAttribute('_taskTypeNames', Types::String),
+     AifCollectionTypeAttribute('return', Types::String)]
+    public List parmTaskTypeNames(List _taskTypeNames = taskTypeNames)
+    {
+        taskTypeNames = _taskTypeNames;
+        return taskTypeNames;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmSecrets</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Secrets referenced by name in the setup (endpoint client secrets, keys). Used for this run only.
+    /// </summary>
+    [DataMemberAttribute('Secrets'),
+     AifCollectionTypeAttribute('_secrets', Types::Class, classStr(BDRServiceSecret)),
+     AifCollectionTypeAttribute('return', Types::Class, classStr(BDRServiceSecret))]
+    public List parmSecrets(List _secrets = secrets)
+    {
+        secrets = _secrets;
+        return secrets;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRequestId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Optional ID of the caller, for example the pipeline run ID. A second call with the same ID
+    /// returns the job of the first call instead of starting a new one.
+    /// </summary>
+    [DataMemberAttribute('RequestId')]
+    public BDRRequestId parmRequestId(BDRRequestId _requestId = requestId)
+    {
+        requestId = _requestId;
+        return requestId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRunInBatch</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// True to schedule all tasks in batch: the call returns the job at once and the caller polls
+    /// getJobStatus until Finished. Secrets cannot be passed in this mode.
+    /// </summary>
+    [DataMemberAttribute('RunInBatch')]
+    public boolean parmRunInBatch(boolean _runInBatch = runInBatch)
+    {
+        runInBatch = _runInBatch;
+        return runInBatch;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmReturnResultOnFailure</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// True to return the job result when the job fails, instead of an error (HTTP 500).
+    /// The caller then checks Succeeded.
+    /// </summary>
+    [DataMemberAttribute('ReturnResultOnFailure')]
+    public boolean parmReturnResultOnFailure(boolean _returnResultOnFailure = returnResultOnFailure)
+    {
+        returnResultOnFailure = _returnResultOnFailure;
+        return returnResultOnFailure;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>secretMap</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the secrets as a map from name to value.
+    /// </summary>
+    public Map secretMap()
+    {
+        Map map = new Map(Types::String, Types::String);
+
+        if (secrets)
+        {
+            ListEnumerator enumerator = secrets.getEnumerator();
+
+            while (enumerator.moveNext())
+            {
+                BDRServiceSecret secret = enumerator.current();
+
+                if (secret && secret.parmName())
+                {
+                    map.insert(secret.parmName(), secret.parmValue());
+                }
+            }
+        }
+
+        return map;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>taskFilter</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the requested task type names, or null when all active tasks should run.
+    /// </summary>
+    public Set taskFilter()
+    {
+        if (!taskTypeNames || !taskTypeNames.elements())
+        {
+            return null;
+        }
+
+        Set filter = new Set(Types::String);
+        ListEnumerator enumerator = taskTypeNames.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            filter.add(enumerator.current());
+        }
+
+        return filter;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRSetupCopyContract</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Parameters of Copy setup. The source is the environment selected in Environments;
+/// the user chooses the target environment.
+/// </summary>
+[DataContractAttribute,
+ SysOperationContractProcessingAttribute(classStr(BDRSetupCopyUIBuilder))]
+public final class BDRSetupCopyContract implements SysOperationValidatable
+{
+    private BDREnvironmentId sourceEnvironmentId;
+    private BDREnvironmentId targetEnvironmentId;
+    private NoYes replaceExisting;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmSourceEnvironmentId</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('SourceEnvironmentId'),
+     SysOperationControlVisibilityAttribute(false)]
+    public BDREnvironmentId parmSourceEnvironmentId(BDREnvironmentId _sourceEnvironmentId = sourceEnvironmentId)
+    {
+        sourceEnvironmentId = _sourceEnvironmentId;
+        return sourceEnvironmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmTargetEnvironmentId</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('TargetEnvironmentId'),
+     SysOperationLabelAttribute(literalStr("@BDR:TargetEnvironment")),
+     SysOperationDisplayOrderAttribute('1')]
+    public BDREnvironmentId parmTargetEnvironmentId(BDREnvironmentId _targetEnvironmentId = targetEnvironmentId)
+    {
+        targetEnvironmentId = _targetEnvironmentId;
+        return targetEnvironmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmReplaceExisting</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('ReplaceExisting'),
+     SysOperationLabelAttribute(literalStr("@BDR:ReplaceExisting")),
+     SysOperationHelpTextAttribute(literalStr("@BDR:ReplaceExistingHelp")),
+     SysOperationDisplayOrderAttribute('2')]
+    public NoYes parmReplaceExisting(NoYes _replaceExisting = replaceExisting)
+    {
+        replaceExisting = _replaceExisting;
+        return replaceExisting;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validate</Name>
+				<Source><![CDATA[
+
+    public boolean validate()
+    {
+        boolean ret = true;
+
+        if (!BDREnvironment::exist(sourceEnvironmentId))
+        {
+            ret = checkFailed("@BDR:ErrOpenFromEnvironment");
+        }
+
+        if (!BDREnvironment::exist(targetEnvironmentId))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrUnknownEnvironment", targetEnvironmentId));
+        }
+
+        if (sourceEnvironmentId == targetEnvironmentId)
+        {
+            ret = checkFailed("@BDR:ErrCopySame");
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

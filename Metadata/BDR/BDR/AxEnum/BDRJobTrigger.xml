@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEnum xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobTrigger</Name>
+	<Label>@BDR:Trigger</Label>
+	<UseEnumValue>Yes</UseEnumValue>
+	<EnumValues>
+		<AxEnumValue>
+			<Name>Manual</Name>
+			<Label>@BDR:TriggerManual</Label>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Service</Name>
+			<Label>@BDR:TriggerService</Label>
+			<Value>1</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Batch</Name>
+			<Label>@BDR:TriggerBatch</Label>
+			<Value>2</Value>
+		</AxEnumValue>
+	</EnumValues>
+</AxEnum>

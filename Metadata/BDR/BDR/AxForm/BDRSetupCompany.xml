@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDRSetupCompany</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDRSetupCompany extends FormRun
+{
+    Common setupRow;
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        if (element.args() && element.args().record())
+        {
+            setupRow = element.args().record();
+        }
+
+        if (!setupRow.RecId || !fieldName2Id(setupRow.TableId, 'AllCompanies') || setupRow.(fieldName2Id(setupRow.TableId, 'AllCompanies')))
+        {
+            throw error("@BDR:ErrOpenFromSetupRow");
+        }
+
+        super();
+
+        element.design().caption(strFmt('%1: %2', element.design().caption(), BDRSetupCompany::rowTitle(setupRow)));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>close</Name>
+				<Source><![CDATA[
+    public void close()
+    {
+        FormDataSource callerDataSource = setupRow.RecId ? setupRow.dataSource() : null;
+
+        super();
+
+        // The row shows the selected companies.
+        if (callerDataSource)
+        {
+            callerDataSource.research(true);
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDRSetupCompany</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            QueryBuildDataSource queryBuildDataSource = this.queryBuildDataSource();
+            QueryBuildRange tableRange = queryBuildDataSource.addRange(fieldNum(BDRSetupCompany, RefTableId));
+            QueryBuildRange recordRange = queryBuildDataSource.addRange(fieldNum(BDRSetupCompany, RefRecId));
+
+            tableRange.value(queryValue(setupRow.TableId));
+            tableRange.status(RangeStatus::Locked);
+            recordRange.value(queryValue(setupRow.RecId));
+            recordRange.status(RangeStatus::Locked);
+            queryBuildDataSource.addSortField(fieldNum(BDRSetupCompany, Company));
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            BDRSetupCompany.RefTableId = setupRow.TableId;
+            BDRSetupCompany.RefRecId = setupRow.RecId;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>Grid_Company</Name>
+				<Type>String</Type>
+				<Methods>
+					<Method>
+						<Name>lookup</Name>
+						<Source><![CDATA[
+        public void lookup()
+        {
+            BDRLookup::lookupCompany(this);
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>AddAllCompanies</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            super();
+
+            BDRSetupCompany::addAllCompanies(setupRow);
+            BDRSetupCompany_ds.research();
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDRSetupCompany</Name>
+			<Table>BDRSetupCompany</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:SetupCompanies</Caption>
+		<DataSource xmlns="">BDRSetupCompany</DataSource>
+		<Pattern xmlns="">SimpleList</Pattern>
+		<PatternVersion xmlns="">1.1</PatternVersion>
+		<Style xmlns="">SimpleList</Style>
+		<TitleDataSource xmlns="">BDRSetupCompany</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormActionPaneControl">
+				<Name>ActionPane</Name>
+				<Type>ActionPane</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonGroupControl">
+						<Name>CompaniesGroup</Name>
+						<Type>ButtonGroup</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonControl">
+								<Name>AddAllCompanies</Name>
+								<Type>Button</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<NormalImage>Add</NormalImage>
+								<Text>@BDR:AddAllCompanies</Text>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDRSetupCompany</DataSource>
+					</AxFormControl>
+				</Controls>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>FilterGroup</Name>
+				<Pattern>CustomAndQuickFilters</Pattern>
+				<PatternVersion>1.1</PatternVersion>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl>
+						<Name>QuickFilter</Name>
+						<FormControlExtension>
+							<Name>QuickFilterControl</Name>
+							<ExtensionComponents />
+							<ExtensionProperties>
+								<AxFormControlExtensionProperty>
+									<Name>targetControlName</Name>
+									<Type>String</Type>
+									<Value>Grid</Value>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>defaultColumnName</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>placeholderText</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+							</ExtensionProperties>
+						</FormControlExtension>
+					</AxFormControl>
+				</Controls>
+				<ArrangeMethod>HorizontalLeft</ArrangeMethod>
+				<FrameType>None</FrameType>
+				<Style>CustomFilter</Style>
+				<ViewEditMode>Edit</ViewEditMode>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGridControl">
+				<Name>Grid</Name>
+				<Type>Grid</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_Company</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>Company</DataField>
+						<DataSource>BDRSetupCompany</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_companyName</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataMethod>companyName</DataMethod>
+						<DataSource>BDRSetupCompany</DataSource>
+						<Label>@BDR:CompanyName</Label>
+					</AxFormControl>
+				</Controls>
+				<DataSource>BDRSetupCompany</DataSource>
+				<Style>Tabular</Style>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

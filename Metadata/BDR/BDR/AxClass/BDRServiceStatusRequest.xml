@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServiceStatusRequest</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Request of the getJobStatus operation: the job ID, or the request ID the job was started with.
+/// </summary>
+/// <example>
+/// { "_request": { "JobId": 5637144576 } } or { "_request": { "RequestId": "pipeline-4711" } }
+/// </example>
+[DataContractAttribute]
+public final class BDRServiceStatusRequest
+{
+    private RefRecId jobId;
+    private BDRRequestId requestId;
+    private BDREnvironmentId environmentId;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmJobId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The job ID that run returned.
+    /// </summary>
+    [DataMemberAttribute('JobId')]
+    public RefRecId parmJobId(RefRecId _jobId = jobId)
+    {
+        jobId = _jobId;
+        return jobId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRequestId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The request ID passed to run; used when no job ID is given.
+    /// </summary>
+    [DataMemberAttribute('RequestId')]
+    public BDRRequestId parmRequestId(BDRRequestId _requestId = requestId)
+    {
+        requestId = _requestId;
+        return requestId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Optional environment of the request ID.
+    /// </summary>
+    [DataMemberAttribute('EnvironmentId')]
+    public BDREnvironmentId parmEnvironmentId(BDREnvironmentId _environmentId = environmentId)
+    {
+        environmentId = _environmentId;
+        return environmentId;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRITaskType</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A task that prepares an environment after a database refresh.
+/// </summary>
+/// <remarks>
+/// Implementations are discovered with <c>SysPluginFactory</c>, the same way Microsoft's archive
+/// types are. To add a task in your own model, implement this interface and add
+/// [ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))] and
+/// [ExportMetadata(classStr(BDRITaskType), 'YourTaskName')] to the class. The metadata value must
+/// match the name returned by <c>registration()</c>. Then run Register task types.
+/// </remarks>
+public interface BDRITaskType
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Describes the task type: name, label, default sequence and whether it runs in batch.
+    /// </summary>
+    /// <returns>The registration item.</returns>
+    public BDRTaskTypeRegistrationItem registration()
+    {
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs the task for the environment in the context. The task manages its own transactions
+    /// and must be safe to run again: the job retries a task after a deadlock or update conflict.
+    /// </summary>
+    /// <param name = "_context">Environment, secrets and logging for this run.</param>
+    public void run(BDRTaskContext _context)
+    {
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeCancelWorkflows</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Cancels pending workflow instances that were copied from production, so approvals that
+/// belong to production are not processed in the copy.
+/// </summary>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'CancelWorkflows')]
+public final class BDRTaskTypeCancelWorkflows implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'CancelWorkflows';
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeCancelWorkflows::Name, literalStr("@BDR:TaskCancelWorkflows"), 30, false, menuItemDisplayStr(BDRWorkflowCancel));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BDRWorkflowCancel workflowCancel;
+        WorkflowTrackingStatusTable trackingStatus;
+        Set correlationIds = new Set(Types::Guid);
+
+        // Only the workflows of the setup rows; without rows nothing is canceled.
+        while select workflowCancel
+            where workflowCancel.EnvironmentId == environmentId
+        {
+            Set companies = workflowCancel.companies();
+
+            while select CorrelationId, ContextCompanyId from trackingStatus
+                where trackingStatus.TrackingStatus == WorkflowTrackingStatus::Pending
+                    && (!workflowCancel.ConfigurationName || trackingStatus.ConfigurationName == workflowCancel.ConfigurationName)
+            {
+                if (workflowCancel.AllCompanies || companies.in(trackingStatus.ContextCompanyId))
+                {
+                    correlationIds.add(trackingStatus.CorrelationId);
+                }
+            }
+        }
+
+        if (correlationIds.elements())
+        {
+            List cancelList = new List(Types::Guid);
+            SetEnumerator enumerator = correlationIds.getEnumerator();
+
+            while (enumerator.moveNext())
+            {
+                cancelList.addEnd(enumerator.current());
+            }
+
+            WorkflowCancelManager::cancelWorkflows(cancelList, "@BDR:WorkflowCancelComment");
+        }
+
+        _context.addRecordsAffected(correlationIds.elements());
+        _context.logInfo(strFmt("@BDR:MsgRecordsUpdated", correlationIds.elements()));
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

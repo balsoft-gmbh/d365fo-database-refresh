@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskContext</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Everything a task needs while it runs: the environment, the secrets passed to the service
+/// call, a record counter and logging into <c>BDRMessageLog</c>.
+/// </summary>
+/// <remarks>
+/// Messages are written on a separate connection, so they stay in the log even when the task
+/// fails and its own transaction is rolled back.
+/// </remarks>
+public final class BDRTaskContext
+{
+    private BDREnvironment environment;
+    private RecId jobHistoryRecId;
+    private RecId taskHistoryRecId;
+    private BDRTaskTypeName taskTypeName;
+    private Map secrets;
+    private BDRRecordsAffected recordsAffected;
+    private boolean errorsFound;
+    private str lastErrorMessage;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+
+    private void new()
+    {
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates the context for one task of a job.
+    /// </summary>
+    /// <param name = "_environment">The environment the job runs for.</param>
+    /// <param name = "_jobHistoryRecId">The job.</param>
+    /// <param name = "_taskHistoryRecId">The task history record of this task.</param>
+    /// <param name = "_taskTypeName">The task type.</param>
+    /// <param name = "_secrets">Secrets by name, may be null.</param>
+    /// <returns>The context.</returns>
+    public static BDRTaskContext construct(BDREnvironment _environment, RecId _jobHistoryRecId, RecId _taskHistoryRecId, BDRTaskTypeName _taskTypeName, Map _secrets)
+    {
+        BDRTaskContext context = new BDRTaskContext();
+
+        context.environment = _environment;
+        context.jobHistoryRecId = _jobHistoryRecId;
+        context.taskHistoryRecId = _taskHistoryRecId;
+        context.taskTypeName = _taskTypeName;
+        context.secrets = _secrets ? _secrets : new Map(Types::String, Types::String);
+
+        return context;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>environmentId</Name>
+				<Source><![CDATA[
+
+    public BDREnvironmentId environmentId()
+    {
+        return environment.EnvironmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>environment</Name>
+				<Source><![CDATA[
+
+    public BDREnvironment environment()
+    {
+        return environment;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>hasSecret</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether a secret was passed to the service call.
+    /// </summary>
+    /// <param name = "_name">The secret name.</param>
+    /// <returns>True if the secret is available.</returns>
+    public boolean hasSecret(BDRSecretName _name)
+    {
+        return _name && secrets.exists(_name);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>secret</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns a secret passed to the service call. Secrets are never stored in the database.
+    /// </summary>
+    /// <param name = "_name">The secret name.</param>
+    /// <returns>The secret value.</returns>
+    public str secret(BDRSecretName _name)
+    {
+        if (!this.hasSecret(_name))
+        {
+            throw error(strFmt("@BDR:ErrSecretMissing", _name));
+        }
+
+        return secrets.lookup(_name);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>addRecordsAffected</Name>
+				<Source><![CDATA[
+
+    public void addRecordsAffected(BDRRecordsAffected _count)
+    {
+        recordsAffected += _count;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>resetRecordsAffected</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Starts counting again, for example before a task is retried after a deadlock.
+    /// </summary>
+    public void resetRecordsAffected()
+    {
+        recordsAffected = 0;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>recordsAffected</Name>
+				<Source><![CDATA[
+
+    public BDRRecordsAffected recordsAffected()
+    {
+        return recordsAffected;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>logInfo</Name>
+				<Source><![CDATA[
+
+    public void logInfo(str _message)
+    {
+        this.log(BDRMessageType::Info, _message);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>logWarning</Name>
+				<Source><![CDATA[
+
+    public void logWarning(str _message)
+    {
+        this.log(BDRMessageType::Warning, _message);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>logError</Name>
+				<Source><![CDATA[
+
+    public void logError(str _message)
+    {
+        errorsFound = true;
+        lastErrorMessage = _message;
+        this.log(BDRMessageType::Error, _message);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>log</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Writes a message into the message log of the job.
+    /// </summary>
+    /// <param name = "_type">Info, warning or error.</param>
+    /// <param name = "_message">The message.</param>
+    public void log(BDRMessageType _type, str _message)
+    {
+        BDRTaskContext::writeMessage(jobHistoryRecId, taskHistoryRecId, taskTypeName, _type, _message);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>writeMessage</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Writes a message on a separate connection so it survives a rollback of the caller.
+    /// </summary>
+    public static void writeMessage(RecId _jobHistoryRecId, RecId _taskHistoryRecId, BDRTaskTypeName _taskTypeName, BDRMessageType _type, str _message)
+    {
+        UserConnection connection = new UserConnection();
+        BDRMessageLog messageLog;
+
+        messageLog.setConnection(connection);
+
+        connection.ttsbegin();
+
+        messageLog.JobHistory = _jobHistoryRecId;
+        messageLog.TaskHistory = _taskHistoryRecId;
+        messageLog.TaskTypeName = _taskTypeName;
+        messageLog.MessageType = _type;
+        messageLog.Message = subStr(_message, 1, 1000);
+        messageLog.insert();
+
+        connection.ttscommit();
+        connection.finalize();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>hasErrors</Name>
+				<Source><![CDATA[
+
+    public boolean hasErrors()
+    {
+        return errorsFound;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>errorMessage</Name>
+				<Source><![CDATA[
+
+    public str errorMessage()
+    {
+        return lastErrorMessage;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

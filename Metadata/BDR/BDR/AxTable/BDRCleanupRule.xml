@@ -1,0 +1,454 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRCleanupRule</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A data cleanup rule: delete records older than a number of days, or empty a table.
+/// In all companies or in the companies selected for the rule.
+/// </summary>
+public class BDRCleanupRule extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.IsActive = NoYes::Yes;
+        this.AllCompanies = NoYes::Yes;
+        this.KeepDays = 90;
+        this.DeleteRelated = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+        TableId tableId = tableName2Id(this.TableName);
+        DictTable dictTable = tableId ? new DictTable(tableId) : null;
+
+        if (!dictTable)
+        {
+            return checkFailed(strFmt("@BDR:ErrInvalidTable", this.TableName));
+        }
+
+        if (!BDRTaskTypeDataCleanup::isTableAllowed(dictTable))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrTableNotAllowed", this.TableName, dictTable.tableGroup()));
+        }
+
+        if (this.CleanupMode == BDRCleanupMode::DeleteOlderThan && !BDRTaskTypeDataCleanup::hasCreatedDateTime(tableId))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrNoCreatedDateTime", this.TableName));
+        }
+
+        if (this.CleanupMode == BDRCleanupMode::DeleteOlderThan && this.KeepDays < 1)
+        {
+            ret = checkFailed(strFmt("@BDR:ErrKeepDaysPositive", this.TableName));
+        }
+
+        return this.validateOtherRules() && ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>insert</Name>
+				<Source><![CDATA[
+
+    public void insert()
+    {
+        // The same rule as update(): Truncate and shared tables are always for all companies (also for copied rows).
+        if (!this.canChooseCompanies())
+        {
+            this.AllCompanies = NoYes::Yes;
+        }
+
+        super();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>update</Name>
+				<Source><![CDATA[
+
+    public void update()
+    {
+        if (!this.canChooseCompanies())
+        {
+            this.AllCompanies = NoYes::Yes;
+        }
+
+        super();
+
+        // All companies replaces the list of selected companies.
+        if (this.AllCompanies)
+        {
+            BDRSetupCompany::deleteFor(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>delete</Name>
+				<Source><![CDATA[
+
+    public void delete()
+    {
+        super();
+
+        BDRSetupCompany::deleteFor(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies this row applies to.
+    /// </summary>
+    /// <returns>A set of company IDs.</returns>
+    public Set companies()
+    {
+        return BDRSetupCompany::companies(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyScope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies; empty when the row is for all companies.
+    /// </summary>
+    public display Description companyScope()
+    {
+        return BDRSetupCompany::scope(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isSharedTable</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the table of the row is shared by all companies.
+    /// </summary>
+    /// <returns>True for a table that is not saved per company.</returns>
+    public boolean isSharedTable()
+    {
+        TableId tableId = tableName2Id(this.TableName);
+
+        return tableId && !new DictTable(tableId).dataPrCompany();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canChooseCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Companies can be chosen to delete records of a table that is saved per company.
+    /// Truncating a table always empties it for all companies.
+    /// </summary>
+    /// <returns>True if the rule can be limited to selected companies.</returns>
+    public boolean canChooseCompanies()
+    {
+        return this.TableName && !this.isSharedTable() && this.CleanupMode != BDRCleanupMode::Truncate;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>modifiedField</Name>
+				<Source><![CDATA[
+
+    public void modifiedField(FieldId _fieldId)
+    {
+        super(_fieldId);
+
+        if (_fieldId == fieldNum(BDRCleanupRule, TableName) || _fieldId == fieldNum(BDRCleanupRule, CleanupMode))
+        {
+            if (!this.canChooseCompanies())
+            {
+                this.AllCompanies = NoYes::Yes;
+            }
+
+            if (this.CleanupMode == BDRCleanupMode::Truncate)
+            {
+                this.DeleteRelated = NoYes::No;
+            }
+
+            // Days to keep only apply when older records are deleted.
+            if (this.CleanupMode != BDRCleanupMode::DeleteOlderThan)
+            {
+                this.KeepDays = 0;
+            }
+            else if (!this.KeepDays)
+            {
+                this.KeepDays = 90;
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateOtherRules</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Truncating a table excludes every other rule of that table; the other rules of a table
+    /// must not cover the same companies.
+    /// </summary>
+    /// <returns>True if the rule fits the other rules of its table.</returns>
+    public boolean validateOtherRules()
+    {
+        BDRCleanupRule other;
+        boolean ret = true;
+
+        while select other
+            where other.EnvironmentId == this.EnvironmentId
+                && other.TableName == this.TableName
+                && other.RecId != this.RecId
+        {
+            if (this.CleanupMode == BDRCleanupMode::Truncate || other.CleanupMode == BDRCleanupMode::Truncate)
+            {
+                return checkFailed(strFmt("@BDR:ErrTruncateExclusive", this.TableName));
+            }
+
+            if (this.AllCompanies || other.AllCompanies)
+            {
+                ret = checkFailed(strFmt("@BDR:ErrCleanupAllCompaniesOverlap", this.TableName, enum2Str(other.CleanupMode))) && ret;
+                continue;
+            }
+
+            SetEnumerator enumerator = this.companies().getEnumerator();
+            Set otherCompanies = other.companies();
+
+            while (enumerator.moveNext())
+            {
+                if (otherCompanies.in(enumerator.current()))
+                {
+                    ret = checkFailed(strFmt("@BDR:ErrCleanupCompaniesOverlap", this.TableName, enum2Str(other.CleanupMode), enumerator.current())) && ret;
+                }
+            }
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>allowsCompany</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether a company can be added to this rule without overlapping another rule of the table.
+    /// </summary>
+    /// <param name = "_company">The company.</param>
+    /// <returns>True if no other rule of the table covers the company.</returns>
+    public boolean allowsCompany(DataAreaId _company)
+    {
+        BDRCleanupRule other;
+
+        while select other
+            where other.EnvironmentId == this.EnvironmentId
+                && other.TableName == this.TableName
+                && other.RecId != this.RecId
+        {
+            if (other.AllCompanies || other.CleanupMode == BDRCleanupMode::Truncate || other.companies().in(_company))
+            {
+                return checkFailed(strFmt("@BDR:ErrCleanupCompaniesOverlap", this.TableName, enum2Str(other.CleanupMode), _company));
+            }
+        }
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:CleanupRules</DeveloperDocumentation>
+	<Label>@BDR:CleanupRules</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>TableName</TitleField1>
+	<TitleField2>CleanupMode</TitleField2>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentTableModeIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentTableModeIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentTableModeIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TableName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>CleanupMode</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeepDays</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>DeleteRelated</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>TableName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>CleanupMode</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeepDays</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>DeleteRelated</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>IsActive</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>TableName</Name>
+			<ExtendedDataType>TableName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>CleanupMode</Name>
+			<EnumType>BDRCleanupMode</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt">
+			<Name>KeepDays</Name>
+			<ExtendedDataType>BDRKeepDays</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>DeleteRelated</Name>
+			<HelpText>@BDR:DeleteRelatedRecordsHelp</HelpText>
+			<Label>@BDR:DeleteRelatedRecords</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AllCompanies</Name>
+			<HelpText>@BDR:RowAllCompaniesHelp</HelpText>
+			<Label>@BDR:AllCompanies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>IsActive</Name>
+			<Label>@BDR:IsActive</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentTableModeIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>TableName</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>CleanupMode</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

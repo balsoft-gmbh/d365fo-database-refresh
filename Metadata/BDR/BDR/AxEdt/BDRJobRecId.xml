@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEdt xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns=""
+	i:type="AxEdtInt64">
+	<Name>BDRJobRecId</Name>
+	<Extends>RefRecId</Extends>
+	<Label>@BDR:Job</Label>
+	<ArrayElements />
+	<Relations />
+	<TableReferences>
+		<AxEdtTableReference>
+			<Name>BDRJobHistory</Name>
+			<Table>BDRJobHistory</Table>
+			<Fields>
+				<AxEdtTableReferenceFilter xmlns=""
+					i:type="AxEdtTableReferenceField">
+					<Name>RecId</Name>
+					<Field>RecId</Field>
+				</AxEdtTableReferenceFilter>
+			</Fields>
+		</AxEdtTableReference>
+	</TableReferences>
+</AxEdt>

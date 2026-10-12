@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobUIBuilder</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+public final class BDRJobUIBuilder extends SysOperationAutomaticUIBuilder
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>postBuild</Name>
+				<Source><![CDATA[
+
+    public void postBuild()
+    {
+        super();
+        BDRJobContract bdrJobContract = this.dataContractObject() as BDRJobContract;
+        DialogField dialogField = this.bindInfo().getDialogField(bdrJobContract, methodStr(BDRJobContract, parmEnvironmentId));
+        dialogField.allowEdit(false);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

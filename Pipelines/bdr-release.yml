@@ -1,0 +1,76 @@
+# BDR (Balsoft Data Refresh): D365FO release pipeline (deploy to PPAC)
+# Deploys the Power Platform unified package produced by `bdr-build` to a
+# Power Platform environment with Finance and Operations (unified developer or
+# sandbox environment), using the Power Platform Build Tools tasks (Tool
+# Installer -> WhoAmI -> Deploy Package) and a Power Platform service connection
+# (service principal + client secret).
+#
+# Runs as a deployment job against an Azure DevOps environment of the same name
+# (Pipelines -> Environments), so deployment history is tracked and approvals or
+# checks can be added there. The target environment URL comes from the service
+# connection. Replace TARGET-ENV with the name of your service connection and
+# Azure DevOps environment. Manual trigger by default.
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: bdrbuild
+      source: bdr-build
+      trigger: none
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  - name: ServiceConnection
+    value: 'TARGET-ENV'
+
+stages:
+  - stage: Deploy
+    displayName: 'Deploy to $(ServiceConnection)'
+    jobs:
+      - deployment: deploy
+        displayName: 'Deploy unified package to PPAC'
+        environment: 'TARGET-ENV'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: bdrbuild
+                  artifact: drop
+                  displayName: 'Download build artifact (drop)'
+
+                # The cloud package folder carries the build number, so resolve it.
+                - powershell: |
+                    $root = "$(Pipeline.Workspace)\bdrbuild\drop"
+                    $dir = Get-ChildItem -Path $root -Directory -Filter "CloudDeployablePackage_*" | Select-Object -First 1
+                    if (-not $dir) { throw "no CloudDeployablePackage_* folder under $root" }
+                    $dll = Join-Path $dir.FullName "TemplatePackage.dll"
+                    if (-not (Test-Path $dll)) { throw "TemplatePackage.dll not found in $($dir.FullName)" }
+                    Write-Host "Unified package: $dll"
+                    Write-Host "##vso[task.setvariable variable=PackageFilePath]$dll"
+                  displayName: 'Locate unified package'
+
+                - task: PowerPlatformToolInstaller@2
+                  displayName: 'Power Platform Tool Installer'
+                  inputs:
+                    DefaultVersion: true
+
+                - task: PowerPlatformWhoAmi@2
+                  displayName: 'Power Platform WhoAmI'
+                  inputs:
+                    authenticationType: 'PowerPlatformSPN'
+                    PowerPlatformSPN: '$(ServiceConnection)'
+
+                - task: PowerPlatformDeployPackage@2
+                  displayName: 'Power Platform Deploy Package'
+                  inputs:
+                    authenticationType: 'PowerPlatformSPN'
+                    PowerPlatformSPN: '$(ServiceConnection)'
+                    PackageFile: '$(PackageFilePath)'
+                    MaxAsyncWaitTime: '180'
+                    logConsole: true

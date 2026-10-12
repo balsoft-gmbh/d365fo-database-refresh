@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDREndpoint</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A business event endpoint of an environment. Its business events are activated in all companies
+/// or in the companies selected for the endpoint.
+/// </summary>
+public class BDREndpoint extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks the fields Microsoft's endpoint tables require for the endpoint type.
+    /// </summary>
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        if (!BDREndpoint::isSupportedType(this.EndpointType))
+        {
+            return checkFailed("@BDR:ErrEndpointType") && ret;
+        }
+
+        // A second endpoint with the same name is refused here, before the dialog sends Microsoft's test event.
+        if (!this.RecId)
+        {
+            BDREndpoint other;
+
+            select firstonly RecId from other
+                where other.EnvironmentId == this.EnvironmentId
+                    && other.EndpointName == this.EndpointName;
+
+            if (other.RecId)
+            {
+                ret = checkFailed(strFmt("@BDR:MsgEndpointExists", this.EndpointName)) && ret;
+            }
+        }
+
+        // BusinessEventsAzureEndpoint: application ID, client secret and Key Vault are mandatory.
+        ret = this.checkRequired(fieldNum(BDREndpoint, AzureAppId)) && ret;
+        ret = this.checkRequired(fieldNum(BDREndpoint, KeyVaultDnsName)) && ret;
+        ret = this.checkRequired(fieldNum(BDREndpoint, KeyVaultSecretName)) && ret;
+        ret = this.checkRequired(fieldNum(BDREndpoint, SecretName)) && ret;
+
+        switch (this.EndpointType)
+        {
+            // Queue, topic, hub and container names are mandatory in their endpoint tables.
+            case BusinessEventsEndpointType::AzureServiceBusQueue:
+            case BusinessEventsEndpointType::AzureServiceBusTopic:
+            case BusinessEventsEndpointType::AzureEventHub:
+            case BusinessEventsEndpointType::AzureBlobStorage:
+                ret = this.checkRequired(fieldNum(BDREndpoint, ResourceName)) && ret;
+                break;
+
+            case BusinessEventsEndpointType::AzureEventGrid:
+                ret = this.checkRequired(fieldNum(BDREndpoint, EndpointUrl)) && ret;
+                break;
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>checkRequired</Name>
+				<Source><![CDATA[
+
+    private boolean checkRequired(FieldId _fieldId)
+    {
+        if (this.(_fieldId))
+        {
+            return true;
+        }
+
+        return checkFailed(strFmt("@BDR:ErrEndpointFieldRequired", fieldId2PName(tableNum(BDREndpoint), _fieldId), this.EndpointType));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isSupportedType</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The endpoint types Microsoft's endpoint configuration form offers.
+    /// </summary>
+    public static boolean isSupportedType(BusinessEventsEndpointType _type)
+    {
+        switch (_type)
+        {
+            case BusinessEventsEndpointType::AzureServiceBusQueue:
+            case BusinessEventsEndpointType::AzureServiceBusTopic:
+            case BusinessEventsEndpointType::AzureEventGrid:
+            case BusinessEventsEndpointType::AzureEventHub:
+            case BusinessEventsEndpointType::AzureBlobStorage:
+            case BusinessEventsEndpointType::Http:
+                return true;
+        }
+
+        return false;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>standardEndpoint</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Builds Microsoft's endpoint record for this row, without saving it.
+    /// </summary>
+    /// <param name = "_appSecret">The client secret of the application; empty to leave it out.</param>
+    /// <returns>The concrete endpoint record, for example <c>BusinessEventsServiceBusQueueEndpoint</c>.</returns>
+    public BusinessEventsAzureEndpoint standardEndpoint(str _appSecret)
+    {
+        BusinessEventsAzureEndpoint azureEndpoint;
+        BusinessEventsServiceBusQueueEndpoint queueEndpoint;
+        BusinessEventsServiceBusTopicEndpoint topicEndpoint;
+        BusinessEventsEventGridEndpoint eventGridEndpoint;
+        BusinessEventsEventHubEndpoint eventHubEndpoint;
+        BusinessEventsAzureBlobStorageEndpoint blobEndpoint;
+
+        switch (this.EndpointType)
+        {
+            case BusinessEventsEndpointType::AzureServiceBusQueue:
+                queueEndpoint.QueueName = this.ResourceName;
+                queueEndpoint.QueueSKU = this.ServiceBusSku;
+                azureEndpoint = queueEndpoint;
+                break;
+
+            case BusinessEventsEndpointType::AzureServiceBusTopic:
+                topicEndpoint.TopicName = this.ResourceName;
+                topicEndpoint.TopicSKU = this.ServiceBusSku;
+                azureEndpoint = topicEndpoint;
+                break;
+
+            case BusinessEventsEndpointType::AzureEventGrid:
+                eventGridEndpoint.EndpointURL = this.EndpointUrl;
+                azureEndpoint = eventGridEndpoint;
+                break;
+
+            case BusinessEventsEndpointType::AzureEventHub:
+                eventHubEndpoint.HubName = this.ResourceName;
+                eventHubEndpoint.EventHubSKU = this.EventHubSku;
+                azureEndpoint = eventHubEndpoint;
+                break;
+
+            case BusinessEventsEndpointType::AzureBlobStorage:
+                blobEndpoint.ContainerName = this.ResourceName;
+                azureEndpoint = blobEndpoint;
+                break;
+
+            case BusinessEventsEndpointType::Http:
+                // HTTPS endpoint: the URL itself is stored in Azure Key Vault.
+                break;
+
+            default:
+                throw error("@BDR:ErrEndpointType");
+        }
+
+        azureEndpoint.Name = this.EndpointName;
+        azureEndpoint.Description = this.Description;
+        azureEndpoint.Type = this.EndpointType;
+        azureEndpoint.AzureAppId = this.AzureAppId;
+        azureEndpoint.KeyVaultDnsName = this.KeyVaultDnsName;
+        azureEndpoint.KeyVaultSecretName = this.KeyVaultSecretName;
+
+        if (_appSecret)
+        {
+            azureEndpoint.editAzureAppSecret(true, _appSecret);
+        }
+
+        return azureEndpoint;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateConnection</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Validates the endpoint the way Microsoft's endpoint setup does: reads the Key Vault secret
+    /// and sends a test event (<c>BusinessEventsEndpointManager::validateEndpoint</c>).
+    /// </summary>
+    /// <param name = "_appSecret">The client secret of the application, used for this test only.</param>
+    /// <returns>True if the test event was sent.</returns>
+    public boolean validateConnection(str _appSecret)
+    {
+        if (!_appSecret)
+        {
+            return checkFailed(strFmt("@BDR:ErrValidationSecretMissing", this.EndpointName));
+        }
+
+        if (!BusinessEventsEndpointManager::validateEndpoint(this.standardEndpoint(_appSecret)))
+        {
+            return false;
+        }
+
+        info(strFmt("@BDR:MsgEndpointValidated", this.EndpointName));
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>connectionChanged</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the row is new or a field that the connection depends on has changed.
+    /// </summary>
+    public boolean connectionChanged()
+    {
+        BDREndpoint saved = this.orig();
+
+        return !this.RecId
+            || this.EndpointType != saved.EndpointType
+            || this.ResourceName != saved.ResourceName
+            || this.EndpointUrl != saved.EndpointUrl
+            || this.ServiceBusSku != saved.ServiceBusSku
+            || this.EventHubSku != saved.EventHubSku
+            || this.AzureAppId != saved.AzureAppId
+            || this.KeyVaultDnsName != saved.KeyVaultDnsName
+            || this.KeyVaultSecretName != saved.KeyVaultSecretName;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.AllCompanies = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>update</Name>
+				<Source><![CDATA[
+
+    public void update()
+    {
+        super();
+
+        // All companies replaces the list of selected companies.
+        if (this.AllCompanies)
+        {
+            BDRSetupCompany::deleteFor(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>delete</Name>
+				<Source><![CDATA[
+
+    public void delete()
+    {
+        super();
+
+        BDRSetupCompany::deleteFor(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies the business events of this endpoint are activated in.
+    /// </summary>
+    /// <returns>A set of company IDs.</returns>
+    public Set companies()
+    {
+        return BDRSetupCompany::companies(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyScope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies; empty when the endpoint is for all companies.
+    /// </summary>
+    public display Description companyScope()
+    {
+        return BDRSetupCompany::scope(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canChooseCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Business events are activated per company, so companies can always be chosen.
+    /// </summary>
+    /// <returns>True.</returns>
+    public boolean canChooseCompanies()
+    {
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:Endpoints</DeveloperDocumentation>
+	<Label>@BDR:Endpoints</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>EndpointName</TitleField1>
+	<TitleField2>EndpointType</TitleField2>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentEndpointIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentEndpointIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentEndpointIdx</PrimaryIndex>
+	<DeleteActions>
+		<AxTableDeleteAction>
+			<Name>BDREndpointEvent</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Endpoint</Relation>
+			<Table>BDREndpointEvent</Table>
+		</AxTableDeleteAction>
+	</DeleteActions>
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EndpointName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Description</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EndpointType</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AzureAppId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyVaultDnsName</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EndpointName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EndpointType</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Description</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AzureAppId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyVaultDnsName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyVaultSecretName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>SecretName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ResourceName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EndpointUrl</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ServiceBusSku</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EventHubSku</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ValidateConnection</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EndpointName</Name>
+			<AllowEdit>No</AllowEdit>
+			<ExtendedDataType>BusinessEventsEndpointName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>Description</Name>
+			<ExtendedDataType>BusinessEventsEndpointDescription</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>EndpointType</Name>
+			<EnumType>BusinessEventsEndpointType</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>AzureAppId</Name>
+			<ExtendedDataType>BusinessEventsAzureAppId</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>KeyVaultDnsName</Name>
+			<ExtendedDataType>BusinessEventsKeyVaultDNSName</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>KeyVaultSecretName</Name>
+			<ExtendedDataType>BusinessEventsKeyVaultSecretName</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>SecretName</Name>
+			<ExtendedDataType>BDRSecretName</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>ResourceName</Name>
+			<ExtendedDataType>BDRResourceName</ExtendedDataType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EndpointUrl</Name>
+			<ExtendedDataType>URL</ExtendedDataType>
+			<Label>@BDR:EndpointUrl</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>ServiceBusSku</Name>
+			<EnumType>BusinessEventsServiceBusSKU</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>EventHubSku</Name>
+			<EnumType>BusinessEventsEventHubSKU</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>ValidateConnection</Name>
+			<HelpText>@BDR:ValidateConnectionHelp</HelpText>
+			<Label>@BDR:ValidateConnection</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AllCompanies</Name>
+			<HelpText>@BDR:EndpointAllCompaniesHelp</HelpText>
+			<Label>@BDR:AllCompanies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentEndpointIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>EndpointName</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

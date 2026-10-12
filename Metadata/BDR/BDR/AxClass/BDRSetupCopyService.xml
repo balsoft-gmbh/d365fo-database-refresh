@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRSetupCopyService</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Copies the database refresh setup of one environment to another environment.
+/// </summary>
+/// <remarks>
+/// The setup is shared by all companies: tasks, users to enable, user roles, batch jobs,
+/// field values, endpoints with their business events and data cleanup rules, each row with
+/// the companies selected for it.
+/// Rows that exist in the target already are skipped, unless Replace existing setup is selected.
+/// Rows and companies that break a rule of the target (for example Truncate next to another cleanup
+/// rule of the table, or overlapping companies) are refused with the reason in the messages.
+/// </remarks>
+public final class BDRSetupCopyService extends SysOperationServiceBase
+{
+    private BDREnvironmentId sourceEnvironmentId;
+    private BDREnvironmentId targetEnvironmentId;
+    private boolean replaceExisting;
+    private int copied;
+    private int skipped;
+    private int refused;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>process</Name>
+				<Source><![CDATA[
+
+    public void process(BDRSetupCopyContract _contract)
+    {
+        if (!_contract.validate())
+        {
+            throw Exception::Error;
+        }
+
+        sourceEnvironmentId = _contract.parmSourceEnvironmentId();
+        targetEnvironmentId = _contract.parmTargetEnvironmentId();
+        replaceExisting = _contract.parmReplaceExisting() == NoYes::Yes;
+
+        this.copyTable(tableNum(BDREnvironmentTask));
+        this.copyTable(tableNum(BDRUserToEnable));
+        this.copyTable(tableNum(BDRUserRole));
+        this.copyTable(tableNum(BDRBatchJob));
+        this.copyTable(tableNum(BDRWorkflowCancel));
+        this.copyTable(tableNum(BDRFieldValue));
+        this.copyTable(tableNum(BDREndpoint));
+        this.copyTable(tableNum(BDREndpointEvent));
+        this.copyTable(tableNum(BDRCleanupRule));
+
+        info(strFmt("@BDR:CopyDone", copied, skipped, refused));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>copyTable</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Copies the rows of one setup table.
+    /// </summary>
+    /// <param name = "_tableId">The setup table; it has an EnvironmentId field.</param>
+    private void copyTable(TableId _tableId)
+    {
+        DictTable dictTable = new DictTable(_tableId);
+        FieldId environmentFieldId = fieldName2Id(_tableId, 'EnvironmentId');
+        Common source = dictTable.makeRecord();
+
+        if (replaceExisting)
+        {
+            this.deleteTarget(dictTable, environmentFieldId);
+        }
+
+        while select source
+            where source.(environmentFieldId) == sourceEnvironmentId
+        {
+            Common target = dictTable.makeRecord();
+
+            buf2Buf(source, target);
+            target.(environmentFieldId) = targetEnvironmentId;
+
+            // The same rules as when the row is entered by hand; validateWrite reports the reason.
+            if (!target.validateWrite())
+            {
+                refused++;
+                continue;
+            }
+
+            if (this.insertCopy(target))
+            {
+                copied++;
+
+                if (fieldName2Id(_tableId, 'AllCompanies'))
+                {
+                    refused += BDRSetupCompany::copy(source, target);
+                }
+            }
+            else
+            {
+                skipped++;
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>insertCopy</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Inserts a copied row.
+    /// </summary>
+    /// <param name = "_target">The row to insert.</param>
+    /// <returns>True if inserted, false if the row exists in the target already.</returns>
+    private boolean insertCopy(Common _target)
+    {
+        try
+        {
+            ttsbegin;
+            _target.insert();
+            ttscommit;
+        }
+        catch (Exception::DuplicateKeyException)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteTarget</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes the setup rows of the target environment that the copy replaces.
+    /// </summary>
+    private void deleteTarget(DictTable _dictTable, FieldId _environmentFieldId)
+    {
+        Common target = _dictTable.makeRecord();
+
+        ttsbegin;
+
+        while select forupdate target
+            where target.(_environmentFieldId) == targetEnvironmentId
+        {
+            target.delete();
+        }
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

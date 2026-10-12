@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDRCleanupRule</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDRCleanupRule extends FormRun
+{
+    BDREnvironment environment;
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        if (element.args() && element.args().record() && element.args().record().TableId == tableNum(BDREnvironment))
+        {
+            environment = element.args().record();
+        }
+
+        if (!environment.RecId)
+        {
+            throw error("@BDR:ErrOpenFromEnvironment");
+        }
+
+        super();
+
+        element.design().caption(strFmt('%1: %2', element.design().caption(), environment.EnvironmentId));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateCompanies</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Companies can be chosen when the row is saved and not for all companies.
+    /// </summary>
+    public void updateCompanies()
+    {
+        boolean canChoose = BDRCleanupRule.canChooseCompanies();
+
+        BDRCleanupRule_ds.object(fieldNum(BDRCleanupRule, AllCompanies)).allowEdit(canChoose);
+        Companies.enabled(canChoose && BDRCleanupRule.RecId && !BDRCleanupRule.AllCompanies);
+
+        // Days to keep only apply when older records are deleted.
+        BDRCleanupRule_ds.object(fieldNum(BDRCleanupRule, KeepDays)).allowEdit(BDRCleanupRule.CleanupMode == BDRCleanupMode::DeleteOlderThan);
+
+        // Truncate never deletes related records.
+        BDRCleanupRule_ds.object(fieldNum(BDRCleanupRule, DeleteRelated)).allowEdit(BDRCleanupRule.CleanupMode != BDRCleanupMode::Truncate);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDRCleanupRule</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                QueryBuildRange range = this.queryBuildDataSource().addRange(fieldNum(BDRCleanupRule, EnvironmentId));
+                range.value(queryValue(environment.EnvironmentId));
+                range.status(RangeStatus::Locked);
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                BDRCleanupRule.EnvironmentId = environment.EnvironmentId;
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>Grid_AllCompanies</Name>
+				<Type>CheckBox</Type>
+				<Methods>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            // Save at once: All companies removes the selected companies and enables Companies.
+            BDRCleanupRule_ds.write();
+            BDRCleanupRule_ds.refresh();
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>Grid_TableName</Name>
+				<Type>String</Type>
+				<Methods>
+					<Method>
+						<Name>lookup</Name>
+						<Source><![CDATA[
+        public void lookup()
+        {
+            BDRLookup::lookupTableName(this, true);
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>Grid_CleanupMode</Name>
+				<Type>ComboBox</Type>
+				<Methods>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDRCleanupRule</Name>
+			<Table>BDRCleanupRule</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:CleanupRules</Caption>
+		<DataSource xmlns="">BDRCleanupRule</DataSource>
+		<Pattern xmlns="">SimpleList</Pattern>
+		<PatternVersion xmlns="">1.1</PatternVersion>
+		<Style xmlns="">SimpleList</Style>
+		<TitleDataSource xmlns="">BDRCleanupRule</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormActionPaneControl">
+				<Name>ActionPane</Name>
+				<Type>ActionPane</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonGroupControl">
+						<Name>RowGroup</Name>
+						<Type>ButtonGroup</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>Companies</Name>
+								<AutoDeclaration>Yes</AutoDeclaration>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataSource>BDRCleanupRule</DataSource>
+								<MenuItemName>BDRSetupCompany</MenuItemName>
+								<NeedsRecord>Yes</NeedsRecord>
+								<Text>@BDR:SetupCompanies</Text>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+				</Controls>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>FilterGroup</Name>
+				<Pattern>CustomAndQuickFilters</Pattern>
+				<PatternVersion>1.1</PatternVersion>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl>
+						<Name>QuickFilter</Name>
+						<FormControlExtension>
+							<Name>QuickFilterControl</Name>
+							<ExtensionComponents />
+							<ExtensionProperties>
+								<AxFormControlExtensionProperty>
+									<Name>targetControlName</Name>
+									<Type>String</Type>
+									<Value>Grid</Value>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>defaultColumnName</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+								<AxFormControlExtensionProperty>
+									<Name>placeholderText</Name>
+									<Type>String</Type>
+								</AxFormControlExtensionProperty>
+							</ExtensionProperties>
+						</FormControlExtension>
+					</AxFormControl>
+				</Controls>
+				<ArrangeMethod>HorizontalLeft</ArrangeMethod>
+				<FrameType>None</FrameType>
+				<Style>CustomFilter</Style>
+				<ViewEditMode>Edit</ViewEditMode>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGridControl">
+				<Name>Grid</Name>
+				<Type>Grid</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_TableName</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>TableName</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormComboBoxControl">
+						<Name>Grid_CleanupMode</Name>
+						<Type>ComboBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>CleanupMode</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormIntegerControl">
+						<Name>Grid_KeepDays</Name>
+						<Type>Integer</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>KeepDays</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>Grid_DeleteRelated</Name>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>DeleteRelated</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>Grid_IsActive</Name>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>IsActive</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>Grid_AllCompanies</Name>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>AllCompanies</DataField>
+						<DataSource>BDRCleanupRule</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>Grid_companyScope</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataMethod>companyScope</DataMethod>
+						<DataSource>BDRCleanupRule</DataSource>
+						<Label>@BDR:SelectedCompanies</Label>
+					</AxFormControl>
+				</Controls>
+				<DataSource>BDRCleanupRule</DataSource>
+				<Style>Tabular</Style>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

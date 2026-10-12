@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDREnvironmentResolver</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Finds the environment a job runs for and refuses to run in production.
+/// </summary>
+/// <remarks>
+/// Environments are identified the way Microsoft identifies them in the monitoring and telemetry
+/// parameters (<c>SysEnvironmentModeMap</c>): by environment ID and environment mode. An
+/// environment matches when its ID equals the Power Platform environment ID (unified environments)
+/// or the LCS environment ID of this instance.
+///
+/// The setup tables hold the configuration of every environment. They are maintained in
+/// production and travel with each copy, so every environment carries all configurations.
+/// </remarks>
+public final class BDREnvironmentResolver
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>currentPowerPlatformEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the Power Platform (PPAC) environment ID of this instance.
+    /// </summary>
+    /// <returns>The ID in lower case, empty if the instance is not a Power Platform environment.</returns>
+    public static SysEnvironmentid currentPowerPlatformEnvironmentId()
+    {
+        str environmentId;
+
+        try
+        {
+            var infrastructure = Microsoft.Dynamics.ApplicationPlatform.Environment.EnvironmentFactory::GetApplicationEnvironment().Infrastructure;
+            environmentId = infrastructure.BapEnvironmentId.ToString();
+        }
+        catch
+        {
+            environmentId = '';
+        }
+
+        return BDREnvironmentResolver::normalize(environmentId);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>currentLcsEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the LCS environment ID of this instance, like <c>SysEnvironmentUtil::getEnvironmentMode</c> reads it.
+    /// </summary>
+    /// <returns>The ID in lower case, empty if there is none.</returns>
+    public static SysEnvironmentid currentLcsEnvironmentId()
+    {
+        str environmentId;
+
+        try
+        {
+            environmentId = Microsoft.Dynamics.ApplicationPlatform.Environment.EnvironmentFactory::GetApplicationEnvironment().LCS.LCSEnvironmentId.ToString();
+        }
+        catch
+        {
+            environmentId = '';
+        }
+
+        return BDREnvironmentResolver::normalize(environmentId);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>currentEnvironmentId</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the ID to set up for this instance: the Power Platform environment ID, or the LCS
+    /// environment ID when the instance is not a Power Platform environment.
+    /// </summary>
+    public static SysEnvironmentid currentEnvironmentId()
+    {
+        SysEnvironmentid environmentId = BDREnvironmentResolver::currentPowerPlatformEnvironmentId();
+
+        return environmentId ? environmentId : BDREnvironmentResolver::currentLcsEnvironmentId();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>normalize</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lower case without blanks; the empty GUID counts as no ID.
+    /// </summary>
+    private static SysEnvironmentid normalize(str _environmentId)
+    {
+        str environmentId = strLwr(strLRTrim(_environmentId));
+
+        if (environmentId == '00000000-0000-0000-0000-000000000000')
+        {
+            return '';
+        }
+
+        return environmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isCurrent</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether an environment ID belongs to this instance.
+    /// </summary>
+    /// <param name = "_environmentId">The environment ID of a setup record.</param>
+    /// <returns>True if it is the Power Platform or LCS environment ID of this instance.</returns>
+    public static boolean isCurrent(SysEnvironmentid _environmentId)
+    {
+        SysEnvironmentid environmentId = BDREnvironmentResolver::normalize(_environmentId);
+
+        return environmentId
+            && (environmentId == BDREnvironmentResolver::currentPowerPlatformEnvironmentId()
+                || environmentId == BDREnvironmentResolver::currentLcsEnvironmentId());
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>findCurrent</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Finds the environment set up for this instance.
+    /// </summary>
+    public static BDREnvironment findCurrent()
+    {
+        SysEnvironmentid powerPlatformId = BDREnvironmentResolver::currentPowerPlatformEnvironmentId();
+        SysEnvironmentid lcsId = BDREnvironmentResolver::currentLcsEnvironmentId();
+        BDREnvironment environment;
+
+        if (powerPlatformId)
+        {
+            environment = BDREnvironment::findBySysEnvironmentId(powerPlatformId);
+        }
+
+        if (!environment.RecId && lcsId)
+        {
+            environment = BDREnvironment::findBySysEnvironmentId(lcsId);
+        }
+
+        return environment;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>resolve</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the environment for a job and checks that it may run on this instance.
+    /// </summary>
+    /// <param name = "_environmentId">The environment code; empty to use the environment set up for this instance.</param>
+    /// <returns>The environment.</returns>
+    public static BDREnvironment resolve(BDREnvironmentId _environmentId = '')
+    {
+        BDREnvironment environment = _environmentId ? BDREnvironment::find(_environmentId) : BDREnvironmentResolver::findCurrent();
+
+        if (!environment.RecId)
+        {
+            if (_environmentId)
+            {
+                throw error(strFmt("@BDR:ErrUnknownEnvironment", _environmentId));
+            }
+
+            throw error(strFmt("@BDR:ErrNoEnvironment",
+                BDREnvironmentResolver::currentPowerPlatformEnvironmentId(),
+                BDREnvironmentResolver::currentLcsEnvironmentId()));
+        }
+
+        // An environment passed by code must be this instance, so production settings never run elsewhere.
+        if (!BDREnvironmentResolver::isCurrent(environment.SysEnvironmentId))
+        {
+            throw error(strFmt("@BDR:ErrEnvironmentMismatch", environment.EnvironmentId, environment.SysEnvironmentId,
+                BDREnvironmentResolver::currentEnvironmentId()));
+        }
+
+        if (environment.EnvironmentMode == EnvironmentMode::Prod)
+        {
+            throw error(strFmt("@BDR:ErrProductionMode", environment.EnvironmentId));
+        }
+
+        return environment;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

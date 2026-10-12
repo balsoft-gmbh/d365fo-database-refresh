@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDREndpointEvent</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A business event that is activated for an endpoint, in the companies of the endpoint.
+/// </summary>
+public class BDREndpointEvent extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>eventName</Name>
+				<Source><![CDATA[
+
+    public display BusinessEventsNameFormatted eventName()
+    {
+        BusinessEventsTable businessEventsTable = BusinessEventsTable::find(this.BusinessEventId);
+        return businessEventsTable.formattedName();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>eventModule</Name>
+				<Source><![CDATA[
+
+    public display Description eventModule()
+    {
+        BusinessEventsTable businessEventsTable = BusinessEventsTable::find(this.BusinessEventId);
+        return businessEventsTable.formattedModuleName();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+        BDREndpoint bdrEndpoint;
+        select firstonly RecId from bdrEndpoint
+            where bdrEndpoint.EnvironmentId == this.EnvironmentId
+                && bdrEndpoint.EndpointName == this.EndpointName;
+        if (!bdrEndpoint.RecId)
+        {
+            ret = checkFailed("@BDR:ErrOpenFromEndpoint") && ret;
+        }
+        if (!BusinessEventsTable::find(this.BusinessEventId).RecId)
+        {
+            ret = checkFailed("@BDR:ErrBusinessEventMissing") && ret;
+        }
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:EndpointEvents</DeveloperDocumentation>
+	<Label>@BDR:EndpointEvents</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>EndpointName</TitleField1>
+	<TitleField2>BusinessEventId</TitleField2>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EndpointEventIdx</ReplacementKey>
+	<ClusteredIndex>EndpointEventIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EndpointEventIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>EndpointName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>BusinessEventId</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>BusinessEventId</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EndpointName</Name>
+			<ExtendedDataType>BusinessEventsEndpointName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>BusinessEventId</Name>
+			<ExtendedDataType>BusinessEventsId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EndpointEventIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>EndpointName</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>BusinessEventId</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+		<AxTableRelation>
+			<Name>Endpoint</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREndpoint</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EndpointName</Name>
+					<Field>EndpointName</Field>
+					<RelatedField>EndpointName</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+		<AxTableRelation>
+			<Name>BusinessEvent</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BusinessEventsTable</RelatedTable>
+			<RelatedTableCardinality>ZeroOne</RelatedTableCardinality>
+			<RelationshipType>Association</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>BusinessEventId</Name>
+					<Field>BusinessEventId</Field>
+					<RelatedField>BusinessEventId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

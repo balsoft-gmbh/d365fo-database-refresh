@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxServiceGroup xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServices</Name>
+	<AutoDeploy>Yes</AutoDeploy>
+	<Description>@BDR:ServiceGroupDescription</Description>
+	<Services>
+		<AxServiceGroupService>
+			<Name>BDRService</Name>
+			<Service>BDRService</Service>
+		</AxServiceGroupService>
+	</Services>
+</AxServiceGroup>

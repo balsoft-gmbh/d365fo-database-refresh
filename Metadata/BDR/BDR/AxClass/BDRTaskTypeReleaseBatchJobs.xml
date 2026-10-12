@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeReleaseBatchJobs</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Releases the batch jobs listed for the environment. The copy puts all batch jobs on hold
+/// (Withhold); only the listed ones go back to Waiting.
+/// </summary>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'ReleaseBatchJobs')]
+public final class BDRTaskTypeReleaseBatchJobs implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'ReleaseBatchJobs';
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeReleaseBatchJobs::Name, literalStr("@BDR:TaskReleaseBatchJobs"), 90, false, menuItemDisplayStr(BDRBatchJob));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BatchJob batchJob;
+        BDRBatchJob release;
+        BDRRecordsAffected released;
+
+        ttsbegin;
+
+        while select forupdate batchJob
+            where batchJob.Status == BatchStatus::Hold
+            exists join release
+                where release.BatchJob == batchJob.RecId
+                    && release.EnvironmentId == environmentId
+        {
+            batchJob.Status = BatchStatus::Waiting;
+            batchJob.update();
+            released++;
+        }
+
+        ttscommit;
+
+        _context.addRecordsAffected(released);
+        _context.logInfo(strFmt("@BDR:MsgRecordsUpdated", released));
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

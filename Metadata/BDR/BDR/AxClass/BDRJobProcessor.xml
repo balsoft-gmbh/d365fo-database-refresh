@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobProcessor</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Runs the active tasks of an environment as one job and records job, task and message history.
+/// </summary>
+/// <remarks>
+/// Each task runs on its own: a failing task is marked failed, its error is logged and the next
+/// task runs, unless Stop on first error is set in the parameters. Long running tasks are
+/// scheduled as a batch job when the job is started from the service, so the HTTP call returns;
+/// the tasks after them follow in the same batch job, so the order of the tasks is kept.
+/// An environment runs one job at a time.
+/// </remarks>
+public final class BDRJobProcessor
+{
+    private const int MaxRetries = 3;
+
+    private BDREnvironment environment;
+    private BDRJobTrigger jobTrigger;
+    private Map secrets;
+    private Set taskFilter;
+    private BDRRequestId requestId;
+    private boolean allInBatch;
+    private BDRJobHistory jobHistory;
+    private boolean stopRequested;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+
+    private void new()
+    {
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Starts a job for an environment.
+    /// </summary>
+    /// <param name = "_environmentId">The environment; empty to find it by host name.</param>
+    /// <param name = "_trigger">How the job was started.</param>
+    /// <param name = "_secrets">Secrets by name for this run, may be null.</param>
+    /// <param name = "_taskFilter">Task type names to run, null for all active tasks.</param>
+    /// <param name = "_requestId">ID of the caller; a job with the same ID is returned instead of starting a new one.</param>
+    /// <param name = "_allInBatch">True to schedule all tasks in batch, so a service call returns at once.</param>
+    /// <returns>The finished, scheduled or earlier job history record.</returns>
+    public static BDRJobHistory run(BDREnvironmentId _environmentId, BDRJobTrigger _trigger, Map _secrets = null, Set _taskFilter = null,
+        BDRRequestId _requestId = '', boolean _allInBatch = false)
+    {
+        BDRJobProcessor processor = new BDRJobProcessor();
+
+        processor.environment = BDREnvironmentResolver::resolve(_environmentId);
+        processor.jobTrigger = _trigger;
+        processor.secrets = _secrets;
+        processor.taskFilter = _taskFilter;
+        processor.requestId = _requestId;
+        processor.allInBatch = _allInBatch && _trigger == BDRJobTrigger::Service;
+
+        // The batch part of a job runs without the secrets of the call.
+        if (processor.allInBatch && _secrets && _secrets.elements())
+        {
+            throw error("@BDR:ErrSecretsNotInBatch");
+        }
+
+        processor.validateTaskFilter();
+        processor.validateSecretsAfterBatch();
+
+        if (!processor.startJob())
+        {
+            return processor.jobHistory;
+        }
+
+        processor.runTasks(false);
+
+        return processor.finishJob();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateTaskFilter</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks that every requested task is an active task of the environment, so a misspelled name
+    /// does not end as a job with nothing to do.
+    /// </summary>
+    private void validateTaskFilter()
+    {
+        str unknown;
+
+        if (!taskFilter)
+        {
+            return;
+        }
+
+        SetEnumerator enumerator = taskFilter.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            BDRTaskTypeName name = enumerator.current();
+            BDREnvironmentTask environmentTask;
+            BDRTaskType taskType;
+
+            select firstonly RecId from environmentTask
+                where environmentTask.EnvironmentId == environment.EnvironmentId
+                    && environmentTask.TaskTypeName == name
+                    && environmentTask.IsActive == NoYes::Yes
+                exists join taskType
+                    where taskType.Name == environmentTask.TaskTypeName
+                        && taskType.IsEnabled == NoYes::Yes;
+
+            if (!environmentTask.RecId)
+            {
+                unknown += (unknown ? ', ' : '') + name;
+            }
+        }
+
+        if (unknown)
+        {
+            throw error(strFmt("@BDR:ErrUnknownTaskTypes", unknown, environment.EnvironmentId));
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateSecretsAfterBatch</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// A service call runs the tasks after a batch task in batch, where the secrets of the call are not
+    /// available. A task that needs a secret must therefore come before the first batch task.
+    /// </summary>
+    private void validateSecretsAfterBatch()
+    {
+        BDREnvironmentTask environmentTask;
+        BDRTaskType taskType;
+        BDRTaskTypeName batchTaskName;
+
+        if (jobTrigger != BDRJobTrigger::Service)
+        {
+            return;
+        }
+
+        while select environmentTask
+            order by Sequence
+            where environmentTask.EnvironmentId == environment.EnvironmentId
+                && environmentTask.IsActive == NoYes::Yes
+            join taskType
+                where taskType.Name == environmentTask.TaskTypeName
+                    && taskType.IsEnabled == NoYes::Yes
+        {
+            if (taskFilter && !taskFilter.in(taskType.Name))
+            {
+                continue;
+            }
+
+            if (batchTaskName && BDRJobProcessor::needsSecrets(taskType.Name, environment.EnvironmentId))
+            {
+                throw error(strFmt("@BDR:ErrSecretsAfterBatch", taskType.Name, batchTaskName));
+            }
+
+            if (!batchTaskName && taskType.RunsInBatch)
+            {
+                batchTaskName = taskType.Name;
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>needsSecrets</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the setup of a task refers to a secret that the pipeline passes at run time.
+    /// </summary>
+    public static boolean needsSecrets(BDRTaskTypeName _taskTypeName, BDREnvironmentId _environmentId)
+    {
+        BDRFieldValue fieldValue;
+        BDREndpoint endpoint;
+
+        switch (_taskTypeName)
+        {
+            case BDRTaskTypeFieldValues::Name:
+                select firstonly RecId from fieldValue
+                    where fieldValue.EnvironmentId == _environmentId
+                        && fieldValue.SecretName != '';
+                return fieldValue.RecId != 0;
+
+            case BDRTaskTypeBusinessEvents::Name:
+                select firstonly RecId from endpoint
+                    where endpoint.EnvironmentId == _environmentId
+                        && endpoint.SecretName != '';
+                return endpoint.RecId != 0;
+        }
+
+        return false;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>continueInBatch</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs the tasks that a service call scheduled in batch.
+    /// </summary>
+    /// <param name = "_jobHistoryRecId">The job to continue.</param>
+    /// <returns>The finished job history record.</returns>
+    public static BDRJobHistory continueInBatch(RecId _jobHistoryRecId)
+    {
+        BDRJobProcessor processor = new BDRJobProcessor();
+
+        processor.jobHistory = BDRJobHistory::find(_jobHistoryRecId);
+        processor.environment = BDREnvironmentResolver::resolve(processor.jobHistory.EnvironmentId);
+        processor.jobTrigger = BDRJobTrigger::Batch;
+
+        processor.setJobStatus(BDRJobStatus::Running);
+        processor.runTasks(true);
+
+        return processor.finishJob();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>startJob</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates the job, one per environment at a time.
+    /// </summary>
+    /// <returns>False if a job with the same request ID exists; it is then the job of this processor.</returns>
+    private boolean startJob()
+    {
+        BDREnvironment lockedEnvironment;
+
+        ttsbegin;
+
+        // Serializes job starts per environment, so two calls cannot both pass the checks below.
+        select firstonly pessimisticlock RecId from lockedEnvironment
+            where lockedEnvironment.RecId == environment.RecId;
+
+        if (requestId)
+        {
+            BDRJobHistory earlierJob = BDRJobHistory::findByRequestId(requestId, environment.EnvironmentId);
+
+            if (earlierJob.RecId)
+            {
+                ttscommit;
+                jobHistory = earlierJob;
+                return false;
+            }
+        }
+
+        BDRJobHistory runningJob = BDRJobHistory::findRunning(environment.EnvironmentId);
+
+        if (runningJob.RecId)
+        {
+            throw error(strFmt("@BDR:ErrJobRunning", environment.EnvironmentId, runningJob.RecId));
+        }
+
+        jobHistory.clear();
+        jobHistory.RequestId = requestId;
+        jobHistory.EnvironmentId = environment.EnvironmentId;
+        jobHistory.Trigger = jobTrigger;
+        jobHistory.Status = BDRJobStatus::Running;
+        jobHistory.StartDateTime = DateTimeUtil::utcNow();
+        jobHistory.StartedBy = curUserId();
+        jobHistory.insert();
+
+        ttscommit;
+
+        BDRTaskContext::writeMessage(jobHistory.RecId, 0, '', BDRMessageType::Info, strFmt("@BDR:MsgJobStarted", environment.EnvironmentId));
+
+        BDRJobHistory::deleteExpired();
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>runTasks</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs the tasks of the job in sequence.
+    /// </summary>
+    /// <param name = "_scheduledOnly">True to run only the tasks that were scheduled in batch for this job.</param>
+    private void runTasks(boolean _scheduledOnly)
+    {
+        BDREnvironmentTask environmentTask;
+        BDRTaskType taskType;
+        boolean scheduleBatch;
+
+        while select environmentTask
+            order by Sequence
+            where environmentTask.EnvironmentId == environment.EnvironmentId
+                && environmentTask.IsActive == NoYes::Yes
+            join taskType
+                where taskType.Name == environmentTask.TaskTypeName
+                    && taskType.IsEnabled == NoYes::Yes
+        {
+            if (taskFilter && !taskFilter.in(taskType.Name))
+            {
+                continue;
+            }
+
+            if (_scheduledOnly)
+            {
+                BDRTaskHistory scheduledTask = BDRTaskHistory::findScheduled(jobHistory.RecId, taskType.Name);
+
+                if (scheduledTask.RecId)
+                {
+                    if (stopRequested)
+                    {
+                        this.updateTaskHistory(scheduledTask.RecId, BDRTaskStatus::Skipped, 0, "");
+                    }
+                    else
+                    {
+                        this.runTask(taskType, environmentTask, scheduledTask.RecId);
+                    }
+                }
+
+                continue;
+            }
+
+            if (stopRequested)
+            {
+                this.createTaskHistory(taskType.Name, environmentTask.Sequence, BDRTaskStatus::Skipped);
+                continue;
+            }
+
+            // Once a task is scheduled, the tasks after it follow in the same batch job.
+            if (jobTrigger == BDRJobTrigger::Service && (taskType.RunsInBatch || allInBatch || scheduleBatch))
+            {
+                this.createTaskHistory(taskType.Name, environmentTask.Sequence, BDRTaskStatus::Scheduled);
+                scheduleBatch = true;
+                continue;
+            }
+
+            this.runTask(taskType, environmentTask, 0);
+        }
+
+        if (scheduleBatch)
+        {
+            this.scheduleBatch();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>runTask</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs one task and records its result. Errors are caught, so the job continues.
+    /// </summary>
+    private void runTask(BDRTaskType _taskType, BDREnvironmentTask _environmentTask, RecId _taskHistoryRecId)
+    {
+        RecId taskHistoryRecId = _taskHistoryRecId ? _taskHistoryRecId : this.createTaskHistory(_taskType.Name, _environmentTask.Sequence, BDRTaskStatus::Waiting);
+        BDRITaskType task = BDRTaskTypeRegistration::getTaskType(_taskType.Name);
+        BDRTaskContext context = BDRTaskContext::construct(environment, jobHistory.RecId, taskHistoryRecId, _taskType.Name, secrets);
+        int infologStart = infologLine();
+
+        this.updateTaskHistory(taskHistoryRecId, BDRTaskStatus::Running, 0, '');
+
+        if (!task)
+        {
+            str missing = strFmt("@BDR:ErrTaskTypeMissing", _taskType.Name);
+            context.logError(missing);
+            this.updateTaskHistory(taskHistoryRecId, BDRTaskStatus::Failed, 0, missing);
+            this.handleFailure();
+            return;
+        }
+
+        try
+        {
+            task.run(context);
+            if (context.hasErrors())
+            {
+                this.updateTaskHistory(taskHistoryRecId, BDRTaskStatus::Failed, context.recordsAffected(), context.errorMessage());
+                this.handleFailure();
+            }
+            else
+            {
+                this.updateTaskHistory(taskHistoryRecId, BDRTaskStatus::Succeeded, context.recordsAffected(), "");
+            }
+        }
+        catch (Exception::Deadlock)
+        {
+            if (xSession::currentRetryCount() < MaxRetries)
+            {
+                // The rolled back attempt must not count.
+                context.resetRecordsAffected();
+                retry;
+            }
+            this.recordFailure(context, taskHistoryRecId, infologStart);
+        }
+        catch (Exception::UpdateConflict)
+        {
+            if (xSession::currentRetryCount() < MaxRetries)
+            {
+                // The rolled back attempt must not count.
+                context.resetRecordsAffected();
+                retry;
+            }
+            this.recordFailure(context, taskHistoryRecId, infologStart);
+        }
+        catch
+        {
+            this.recordFailure(context, taskHistoryRecId, infologStart);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>recordFailure</Name>
+				<Source><![CDATA[
+
+    private void recordFailure(BDRTaskContext _context, RecId _taskHistoryRecId, int _infologStart)
+    {
+        str message = BDRJobProcessor::infologText(_infologStart);
+
+        if (!message)
+        {
+            System.Exception clrException = CLRInterop::getLastException();
+            message = clrException ? clrException.Message : '';
+        }
+
+        _context.logError(message);
+        this.updateTaskHistory(_taskHistoryRecId, BDRTaskStatus::Failed, _context.recordsAffected(), message);
+        this.handleFailure();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>handleFailure</Name>
+				<Source><![CDATA[
+
+    private void handleFailure()
+    {
+        if (BDRParameters::find().StopOnError)
+        {
+            stopRequested = true;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>infologText</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Joins the infolog lines written since a given line, without the prefix of nested entries.
+    /// </summary>
+    /// <param name = "_fromLine">The infolog line before the task started.</param>
+    /// <returns>The messages, separated by a space.</returns>
+    public static str infologText(int _fromLine)
+    {
+        str text;
+
+        for (int line = _fromLine + 1; line <= infologLine(); line++)
+        {
+            str entry = strLRTrim(strRem(infolog.text(line), '\t'));
+
+            if (entry)
+            {
+                text += (text ? ' ' : '') + entry;
+            }
+        }
+
+        return subStr(text, 1, 1000);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createTaskHistory</Name>
+				<Source><![CDATA[
+
+    private RecId createTaskHistory(BDRTaskTypeName _taskTypeName, BDRSequence _sequence, BDRTaskStatus _status)
+    {
+        BDRTaskHistory taskHistory;
+
+        ttsbegin;
+
+        taskHistory.JobHistory = jobHistory.RecId;
+        taskHistory.TaskTypeName = _taskTypeName;
+        taskHistory.Sequence = _sequence;
+        taskHistory.Status = _status;
+        taskHistory.insert();
+
+        ttscommit;
+
+        return taskHistory.RecId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateTaskHistory</Name>
+				<Source><![CDATA[
+
+    private void updateTaskHistory(RecId _taskHistoryRecId, BDRTaskStatus _status, BDRRecordsAffected _recordsAffected, str _message)
+    {
+        BDRTaskHistory taskHistory;
+
+        ttsbegin;
+
+        select firstonly forupdate taskHistory
+            where taskHistory.RecId == _taskHistoryRecId;
+
+        taskHistory.Status = _status;
+
+        if (_status == BDRTaskStatus::Running)
+        {
+            taskHistory.StartDateTime = DateTimeUtil::utcNow();
+        }
+        else
+        {
+            taskHistory.EndDateTime = DateTimeUtil::utcNow();
+            taskHistory.RecordsAffected = _recordsAffected;
+            taskHistory.Message = subStr(_message, 1, 1000);
+        }
+
+        taskHistory.update();
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>scheduleBatch</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates a batch job that continues this job with the scheduled tasks.
+    /// </summary>
+    private void scheduleBatch()
+    {
+        BDRJobController controller = BDRJobController::construct(SysOperationExecutionMode::ScheduledBatch);
+        BDRJobContract contract = controller.getDataContractObject() as BDRJobContract;
+
+        contract.parmEnvironmentId(environment.EnvironmentId);
+        contract.parmContinueJobRecId(jobHistory.RecId);
+
+        controller.batchInfo().parmCaption(strFmt('%1 %2 (%3)', "@BDR:ContinueJob", jobHistory.RecId, environment.EnvironmentId));
+        controller.parmShowDialog(false);
+        controller.startOperation();
+
+        BDRTaskContext::writeMessage(jobHistory.RecId, 0, '', BDRMessageType::Info,
+            strFmt("@BDR:MsgTaskScheduled", "@BDR:ContinueJob", controller.batchInfo().parmBatchHeader().parmBatchHeaderId()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>setJobStatus</Name>
+				<Source><![CDATA[
+
+    private void setJobStatus(BDRJobStatus _status)
+    {
+        ttsbegin;
+
+        jobHistory.selectForUpdate(true);
+        jobHistory.reread();
+        jobHistory.Status = _status;
+        jobHistory.update();
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>finishJob</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Sets the job status from its task results.
+    /// </summary>
+    /// <returns>The job history record.</returns>
+    private BDRJobHistory finishJob()
+    {
+        BDRTaskHistory taskHistory;
+        boolean anySucceeded, anyFailed, anyScheduled;
+        BDRJobStatus status;
+
+        while select Status from taskHistory
+            where taskHistory.JobHistory == jobHistory.RecId
+        {
+            switch (taskHistory.Status)
+            {
+                case BDRTaskStatus::Succeeded:
+                    anySucceeded = true;
+                    break;
+                case BDRTaskStatus::Failed:
+                    anyFailed = true;
+                    break;
+                case BDRTaskStatus::Scheduled:
+                    anyScheduled = true;
+                    break;
+            }
+        }
+
+        if (anyFailed)
+        {
+            status = anySucceeded ? BDRJobStatus::PartlySucceeded : BDRJobStatus::Failed;
+        }
+        else if (anyScheduled)
+        {
+            status = BDRJobStatus::Scheduled;
+        }
+        else
+        {
+            status = BDRJobStatus::Succeeded;
+        }
+
+        ttsbegin;
+
+        jobHistory.selectForUpdate(true);
+        jobHistory.reread();
+        jobHistory.Status = status;
+        jobHistory.EndDateTime = status == BDRJobStatus::Scheduled ? utcDateTimeNull() : DateTimeUtil::utcNow();
+
+        if (!anySucceeded && !anyFailed && !anyScheduled)
+        {
+            jobHistory.Message = "@BDR:MsgNothingToDo";
+        }
+
+        jobHistory.update();
+
+        ttscommit;
+
+        return jobHistory;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

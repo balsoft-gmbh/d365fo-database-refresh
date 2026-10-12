@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeAssignRoles</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Assigns security roles to users for the environment, for example extra roles for testers in UAT.
+/// </summary>
+/// <remarks>
+/// Roles are identified by their AOT name, which is the same in every environment, unlike the record ID.
+/// </remarks>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'AssignRoles')]
+public final class BDRTaskTypeAssignRoles implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'AssignRoles';
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeAssignRoles::Name, literalStr("@BDR:TaskAssignRoles"), 20, false, menuItemDisplayStr(BDRUserRole));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BDRUserRole userRole;
+        BDRRecordsAffected assigned;
+
+        while select userRole
+            where userRole.EnvironmentId == environmentId
+        {
+            SecurityRole securityRole;
+
+            select firstonly RecId from securityRole
+                where securityRole.AotName == userRole.SecurityRoleName;
+
+            if (!securityRole.RecId)
+            {
+                _context.logWarning(strFmt("@BDR:ErrRoleMissing", userRole.SecurityRoleName));
+                continue;
+            }
+
+            UserInfo userInfo;
+
+            select firstonly RecId from userInfo
+                where userInfo.id == userRole.UserId;
+
+            if (!userInfo.RecId)
+            {
+                _context.logWarning(strFmt("@BDR:ErrUserMissing", userRole.UserId));
+                continue;
+            }
+
+            if (this.assign(userRole.UserId, securityRole.RecId))
+            {
+                assigned++;
+            }
+        }
+
+        _context.addRecordsAffected(assigned);
+        _context.logInfo(strFmt("@BDR:MsgRecordsUpdated", assigned));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>assign</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Assigns a role to a user, or enables an existing assignment that is disabled.
+    /// </summary>
+    /// <returns>True if something was changed.</returns>
+    private boolean assign(UserId _userId, RefRecId _securityRoleRecId)
+    {
+        SecurityUserRole securityUserRole;
+
+        ttsbegin;
+
+        select firstonly forupdate securityUserRole
+            where securityUserRole.User == _userId
+                && securityUserRole.SecurityRole == _securityRoleRecId;
+
+        if (securityUserRole.RecId)
+        {
+            if (securityUserRole.AssignmentStatus == RoleAssignmentStatus::Enabled)
+            {
+                ttscommit;
+                return false;
+            }
+
+            securityUserRole.AssignmentStatus = RoleAssignmentStatus::Enabled;
+            securityUserRole.update();
+        }
+        else
+        {
+            securityUserRole.User = _userId;
+            securityUserRole.SecurityRole = _securityRoleRecId;
+            securityUserRole.AssignmentMode = RoleAssignmentMode::Manual;
+            securityUserRole.AssignmentStatus = RoleAssignmentStatus::Enabled;
+
+            SecuritySegregationOfDuties::assignUserToRole(securityUserRole, null);
+        }
+
+        ttscommit;
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRLookup</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Lookups for the setup forms: tables and fields from the application metadata, security roles,
+/// batch jobs, companies and business events.
+/// </summary>
+public final class BDRLookup
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>lookupTableName</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lists the tables of the application with name and label.
+    /// </summary>
+    /// <param name = "_control">The table name control.</param>
+    /// <param name = "_cleanupOnly">True to list only tables that data cleanup accepts.</param>
+    public static void lookupTableName(FormStringControl _control, boolean _cleanupOnly = false)
+    {
+        BDRLookupTmp tables;
+        Dictionary dictionary = new Dictionary();
+        TableId tableId = dictionary.tableNext(0);
+
+        while (tableId)
+        {
+            DictTable dictTable = new DictTable(tableId);
+
+            if (dictTable
+                && !dictTable.isView()
+                && dictTable.tableType() == TableType::Regular
+                && !dictTable.isSystemTable()
+                && !dictTable.isMap()
+                && (!_cleanupOnly || BDRTaskTypeDataCleanup::isTableAllowed(dictTable)))
+            {
+                tables.clear();
+                tables.ElementName = dictTable.name();
+                tables.ElementLabel = dictTable.label();
+                tables.insert();
+            }
+
+            tableId = dictionary.tableNext(tableId);
+        }
+
+        BDRLookup::performTmpLookup(_control, tables);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupFieldName</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lists the fields of a table with name and label.
+    /// </summary>
+    /// <param name = "_control">The field name control.</param>
+    /// <param name = "_tableName">The table whose fields are listed.</param>
+    public static void lookupFieldName(FormStringControl _control, TableName _tableName)
+    {
+        BDRLookupTmp fields;
+        TableId tableId = tableName2Id(_tableName);
+        DictTable dictTable = tableId ? new DictTable(tableId) : null;
+
+        if (dictTable)
+        {
+            for (int i = 1; i <= dictTable.fieldCnt(); i++)
+            {
+                DictField dictField = new DictField(tableId, dictTable.fieldCnt2Id(i));
+
+                if (dictField && !dictField.isSystem())
+                {
+                    fields.clear();
+                    fields.ElementName = dictField.name();
+                    fields.ElementLabel = dictField.label();
+                    fields.insert();
+                }
+            }
+        }
+
+        BDRLookup::performTmpLookup(_control, fields);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>performTmpLookup</Name>
+				<Source><![CDATA[
+
+    private static void performTmpLookup(FormStringControl _control, BDRLookupTmp _elements)
+    {
+        SysTableLookup lookup = SysTableLookup::newParameters(tableNum(BDRLookupTmp), _control);
+        Query query = new Query();
+
+        query.addDataSource(tableNum(BDRLookupTmp)).addSortField(fieldNum(BDRLookupTmp, ElementName));
+
+        lookup.addLookupfield(fieldNum(BDRLookupTmp, ElementName), true);
+        lookup.addLookupfield(fieldNum(BDRLookupTmp, ElementLabel));
+        lookup.parmQuery(query);
+        lookup.parmTmpBuffer(_elements);
+        lookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupSecurityRole</Name>
+				<Source><![CDATA[
+
+    public static void lookupSecurityRole(FormStringControl _control)
+    {
+        SecurityRole securityRole;
+        BDRLookupTmp bdrLookupTmp;
+
+        while select AotName, Name from securityRole
+        {
+            bdrLookupTmp.clear();
+            bdrLookupTmp.ElementName = securityRole.AotName;
+            bdrLookupTmp.ElementLabel = BDRLookup::securityRoleName(securityRole);
+            bdrLookupTmp.insert();
+        }
+
+        SysTableLookup sysTableLookup = SysTableLookup::newParameters(tableNum(BDRLookupTmp), _control);
+        Query query = new Query();
+
+        query.addDataSource(tableNum(BDRLookupTmp)).addSortField(fieldNum(BDRLookupTmp, ElementLabel));
+        sysTableLookup.addLookupfield(fieldNum(BDRLookupTmp, ElementLabel));
+        sysTableLookup.addLookupfield(fieldNum(BDRLookupTmp, ElementName), true);
+        sysTableLookup.parmQuery(query);
+        sysTableLookup.parmTmpBuffer(bdrLookupTmp);
+        sysTableLookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupBatchJob</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lists batch jobs with description and current status; returns the record ID.
+    /// </summary>
+    public static void lookupBatchJob(FormInt64Control _control)
+    {
+        SysTableLookup lookup = SysTableLookup::newParameters(tableNum(BatchJob), _control);
+        Query query = new Query();
+
+        query.addDataSource(tableNum(BatchJob)).addSortField(fieldNum(BatchJob, Caption));
+
+        lookup.addLookupfield(fieldNum(BatchJob, RecId), true);
+        lookup.addLookupfield(fieldNum(BatchJob, Caption));
+        lookup.addLookupfield(fieldNum(BatchJob, Status));
+        lookup.parmQuery(query);
+        lookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupCompany</Name>
+				<Source><![CDATA[
+
+    public static void lookupCompany(FormStringControl _control)
+    {
+        SysTableLookup sysTableLookup = SysTableLookup::newParameters(tableNum(CompanyInfo), _control);
+        Query query = new Query();
+        QueryBuildDataSource queryBuildDataSource = query.addDataSource(tableNum(CompanyInfo));
+
+        queryBuildDataSource.addSortField(fieldNum(CompanyInfo, DataArea));
+        sysTableLookup.addLookupfield(fieldNum(CompanyInfo, DataArea), true);
+        sysTableLookup.addLookupfield(fieldNum(CompanyInfo, Name));
+        sysTableLookup.parmQuery(query);
+        sysTableLookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>lookupBusinessEvent</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Lists the business events of the catalog with name and module.
+    /// </summary>
+    public static void lookupBusinessEvent(FormStringControl _control)
+    {
+        SysTableLookup lookup = SysTableLookup::newParameters(tableNum(BusinessEventsTable), _control);
+        Query query = new Query();
+        QueryBuildDataSource dataSource = query.addDataSource(tableNum(BusinessEventsTable));
+
+        dataSource.addSortField(fieldNum(BusinessEventsTable, Module));
+        dataSource.addSortField(fieldNum(BusinessEventsTable, Name));
+
+        lookup.addLookupfield(fieldNum(BusinessEventsTable, BusinessEventId), true);
+        lookup.addLookupMethod(tableMethodStr(BusinessEventsTable, formattedName));
+        lookup.addLookupMethod(tableMethodStr(BusinessEventsTable, formattedModuleName));
+        lookup.parmQuery(query);
+        lookup.performFormLookup();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>securityRoleName</Name>
+				<Source><![CDATA[
+
+    public static SecurityRoleName securityRoleName(SecurityRole _securityRole)
+    {
+        Microsoft.Dynamics.AX.Metadata.MetaModel.AxSecurityRole roleMetadata =
+            Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetSecurityRole(_securityRole.AotName);
+
+        SecurityRoleName roleName;
+        if (roleMetadata && roleMetadata.Label)
+        {
+            roleName = SysLabel::labelId2String(roleMetadata.Label);
+        }
+        if (!roleName)
+        {
+            roleName = SysLabel::labelId2String(_securityRole.Name);
+        }
+        return roleName && !strStartsWith(roleName, "@") ? roleName : _securityRole.AotName;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

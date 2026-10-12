@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEnum xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobStatus</Name>
+	<Label>@BDR:JobStatus</Label>
+	<UseEnumValue>Yes</UseEnumValue>
+	<EnumValues>
+		<AxEnumValue>
+			<Name>Waiting</Name>
+			<Label>@BDR:StatusWaiting</Label>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Running</Name>
+			<Label>@BDR:StatusRunning</Label>
+			<Value>1</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Succeeded</Name>
+			<Label>@BDR:StatusSucceeded</Label>
+			<Value>2</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Failed</Name>
+			<Label>@BDR:StatusFailed</Label>
+			<Value>3</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>PartlySucceeded</Name>
+			<Label>@BDR:StatusPartlySucceeded</Label>
+			<Value>4</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Scheduled</Name>
+			<Label>@BDR:StatusScheduled</Label>
+			<Value>5</Value>
+		</AxEnumValue>
+	</EnumValues>
+</AxEnum>

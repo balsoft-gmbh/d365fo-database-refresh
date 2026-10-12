@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDRJobHistoryPart</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDRJobHistoryPart extends FormRun implements IRefreshable
+{
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>refresh</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Called by the workspace to show new jobs.
+    /// </summary>
+    public void refresh()
+    {
+        BDRJobHistory_ds.research(true);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDRJobHistory</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            this.queryBuildDataSource().addSortField(fieldNum(BDRJobHistory, StartDateTime), SortOrder::Descending);
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            // The grids below follow the selected job, as on the environments form.
+            BDRTaskHistory_ds.executeQuery();
+            BDRMessageLog_ds.executeQuery();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+			<DataSource>
+				<Name>BDRTaskHistory</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            this.queryBuildDataSource().addSortField(fieldNum(BDRTaskHistory, Sequence));
+            this.cacheAddMethod(tableMethodStr(BDRTaskHistory, taskLabel));
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>executeQuery</Name>
+						<Source><![CDATA[
+        public void executeQuery()
+        {
+            SysQuery::findOrCreateRange(this.queryBuildDataSource(), fieldNum(BDRTaskHistory, JobHistory)).value(
+                queryValue(BDRJobHistory.RecId));
+
+            super();
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            BDRMessageLog_ds.executeQuery();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+			<DataSource>
+				<Name>BDRMessageLog</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            this.queryBuildDataSource().addSortField(fieldNum(BDRMessageLog, CreatedDateTime));
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>executeQuery</Name>
+						<Source><![CDATA[
+        public void executeQuery()
+        {
+            QueryBuildDataSource qbds = this.queryBuildDataSource();
+
+            SysQuery::findOrCreateRange(qbds, fieldNum(BDRMessageLog, JobHistory)).value(queryValue(BDRJobHistory.RecId));
+
+            // The messages of the selected task; the messages of the job itself when it has no task.
+            SysQuery::findOrCreateRange(qbds, fieldNum(BDRMessageLog, TaskHistory)).value(
+                ShowAllMessages.value() ? '' : queryValue(BDRTaskHistory.RecId));
+
+            super();
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>ShowAllMessages</Name>
+				<Type>CheckBox</Type>
+				<Methods>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            BDRMessageLog_ds.executeQuery();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDRJobHistory</Name>
+			<Table>BDRJobHistory</Table>
+			<AllowCreate>No</AllowCreate>
+			<AllowEdit>No</AllowEdit>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+		<AxFormDataSource xmlns="">
+			<Name>BDRTaskHistory</Name>
+			<Table>BDRTaskHistory</Table>
+			<AllowCreate>No</AllowCreate>
+			<AllowDelete>No</AllowDelete>
+			<AllowEdit>No</AllowEdit>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<JoinSource>BDRJobHistory</JoinSource>
+			<LinkType>Active</LinkType>
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+		<AxFormDataSource xmlns="">
+			<Name>BDRMessageLog</Name>
+			<Table>BDRMessageLog</Table>
+			<AllowCreate>No</AllowCreate>
+			<AllowDelete>No</AllowDelete>
+			<AllowEdit>No</AllowEdit>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<JoinSource>BDRJobHistory</JoinSource>
+			<LinkType>Active</LinkType>
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:JobHistory</Caption>
+		<Pattern xmlns="">Custom</Pattern>
+		<Style xmlns="">FormPart</Style>
+		<ViewEditMode xmlns="">Edit</ViewEditMode>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormGridControl">
+				<Name>JobsGrid</Name>
+				<Type>Grid</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormDateTimeControl">
+						<Name>JobsGrid_StartDateTime</Name>
+						<Type>DateTime</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>StartDateTime</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>JobsGrid_EnvironmentId</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>EnvironmentId</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormComboBoxControl">
+						<Name>JobsGrid_Trigger</Name>
+						<Type>ComboBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>Trigger</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormComboBoxControl">
+						<Name>JobsGrid_Status</Name>
+						<Type>ComboBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>Status</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormDateTimeControl">
+						<Name>JobsGrid_EndDateTime</Name>
+						<Type>DateTime</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>EndDateTime</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>JobsGrid_StartedBy</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>StartedBy</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>JobsGrid_Message</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>Message</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>JobsGrid_RequestId</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>RequestId</DataField>
+						<DataSource>BDRJobHistory</DataSource>
+					</AxFormControl>
+				</Controls>
+				<DataSource>BDRJobHistory</DataSource>
+				<Style>Tabular</Style>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>TasksGroup</Name>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormGridControl">
+						<Name>TasksGrid</Name>
+						<Type>Grid</Type>
+						<WidthMode>SizeToAvailable</WidthMode>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormIntegerControl">
+								<Name>TasksGrid_Sequence</Name>
+								<Type>Integer</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Sequence</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>TasksGrid_TaskTypeName</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>TaskTypeName</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormComboBoxControl">
+								<Name>TasksGrid_Status</Name>
+								<Type>ComboBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Status</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormDateTimeControl">
+								<Name>TasksGrid_StartDateTime</Name>
+								<Type>DateTime</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>StartDateTime</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormDateTimeControl">
+								<Name>TasksGrid_EndDateTime</Name>
+								<Type>DateTime</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>EndDateTime</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormInt64Control">
+								<Name>TasksGrid_RecordsAffected</Name>
+								<Type>Int64</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>RecordsAffected</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>TasksGrid_Message</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Message</DataField>
+								<DataSource>BDRTaskHistory</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>TasksGrid_taskLabel</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataMethod>taskLabel</DataMethod>
+								<DataSource>BDRTaskHistory</DataSource>
+								<Label>@SYS7576</Label>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDRTaskHistory</DataSource>
+						<Style>Tabular</Style>
+					</AxFormControl>
+				</Controls>
+				<Caption>@BDR:TasksSection</Caption>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>MessagesGroup</Name>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>ShowAllMessages</Name>
+						<AutoDeclaration>Yes</AutoDeclaration>
+						<HelpText>@BDR:ShowAllJobMessagesHelp</HelpText>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Label>@BDR:ShowAllJobMessages</Label>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormGridControl">
+						<Name>MessagesGrid</Name>
+						<Type>Grid</Type>
+						<WidthMode>SizeToAvailable</WidthMode>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>MessagesGrid_TaskTypeName</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>TaskTypeName</DataField>
+								<DataSource>BDRMessageLog</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormComboBoxControl">
+								<Name>MessagesGrid_MessageType</Name>
+								<Type>ComboBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>MessageType</DataField>
+								<DataSource>BDRMessageLog</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>MessagesGrid_Message</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Message</DataField>
+								<DataSource>BDRMessageLog</DataSource>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDRMessageLog</DataSource>
+						<Style>Tabular</Style>
+					</AxFormControl>
+				</Controls>
+				<Caption>@BDR:TaskMessagesSection</Caption>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

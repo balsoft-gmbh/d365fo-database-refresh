@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxLabelFile xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDR_de</Name>
+	<LabelContentFileName>BDR.de.label.txt</LabelContentFileName>
+	<LabelFileId>BDR</LabelFileId>
+	<Language>de</Language>
+	<RelativeUriInModelStore>BDR\BDR\AxLabelFile\LabelResources\de\BDR.de.label.txt</RelativeUriInModelStore>
+</AxLabelFile>

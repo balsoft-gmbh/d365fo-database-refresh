@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxSecurityPrivilege xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRWorkspaceView</Name>
+	<Description>@BDR:WorkspaceViewDutyDescription</Description>
+	<Label>@BDR:WorkspaceViewPrivilege</Label>
+	<DirectAccessPermissions />
+	<EntryPoints>
+		<AxSecurityEntryPointReference>
+			<Name>BDRWorkspace</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRWorkspace</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDREnvironment</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDREnvironment</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRParameters</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRParameters</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRTaskType</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRTaskType</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRJobHistoryPart</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRJobHistoryPart</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRJobHistory</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRJobHistory</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRFieldValue</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRFieldValue</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRUserRole</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRUserRole</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRUserToEnable</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRUserToEnable</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRBatchJob</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRBatchJob</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRWorkflowCancel</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRWorkflowCancel</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDREndpoint</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDREndpoint</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDREndpointCreate</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDREndpointCreate</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRCleanupRule</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRCleanupRule</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRSetupCompany</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRSetupCompany</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+	</EntryPoints>
+	<FormControlOverrides />
+</AxSecurityPrivilege>

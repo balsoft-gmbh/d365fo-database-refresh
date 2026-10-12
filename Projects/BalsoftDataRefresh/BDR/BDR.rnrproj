@@ -1,0 +1,616 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <BuildTasksDirectory Condition=" '$(BuildTasksDirectory)' == ''">$(MSBuildProgramFiles32)\MSBuild\Microsoft\Dynamics\AX</BuildTasksDirectory>
+    <Model>BDR</Model>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <OutputPath>bin</OutputPath>
+    <SchemaVersion>2.0</SchemaVersion>
+    <GenerateCrossReferences>True</GenerateCrossReferences>
+    <RunAppCheckerRules>False</RunAppCheckerRules>
+    <LogAppcheckerDiagsAsErrors>False</LogAppcheckerDiagsAsErrors>
+    <DeployOnline>False</DeployOnline>
+    <ProjectGuid>{6d8a0f3e-4b1c-4e7a-9a52-1f0b7c3d2e91}</ProjectGuid>
+    <Name>BDR</Name>
+    <RootNamespace>BDR</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <Configuration>Debug</Configuration>
+    <DBSyncInBuild>False</DBSyncInBuild>
+    <GenerateFormAdaptors>False</GenerateFormAdaptors>
+    <Company>
+    </Company>
+    <Partition>initial</Partition>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DataEntityExpandParentChildRelations>False</DataEntityExpandParentChildRelations>
+    <DataEntityUseLabelTextAsFieldName>False</DataEntityUseLabelTextAsFieldName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Action Menu Items" />
+    <Folder Include="Base Enums" />
+    <Folder Include="Classes" />
+    <Folder Include="Display Menu Items" />
+    <Folder Include="Extended Data Types" />
+    <Folder Include="Forms" />
+    <Folder Include="Label Files" />
+    <Folder Include="Menu Extensions" />
+    <Folder Include="Menus" />
+    <Folder Include="Security Duties" />
+    <Folder Include="Security Privileges" />
+    <Folder Include="Security Roles" />
+    <Folder Include="Service Groups" />
+    <Folder Include="Services" />
+    <Folder Include="Tables" />
+    <Folder Include="Tiles" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="AxMenuItemAction\BDRJobController">
+      <SubType>Content</SubType>
+      <Name>BDRJobController</Name>
+      <Link>Action Menu Items\BDRJobController</Link>
+    </Content>
+    <Content Include="AxMenuItemAction\BDRSetupCopyController">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCopyController</Name>
+      <Link>Action Menu Items\BDRSetupCopyController</Link>
+    </Content>
+    <Content Include="AxEnum\BDRCleanupMode">
+      <SubType>Content</SubType>
+      <Name>BDRCleanupMode</Name>
+      <Link>Base Enums\BDRCleanupMode</Link>
+    </Content>
+    <Content Include="AxEnum\BDRJobStatus">
+      <SubType>Content</SubType>
+      <Name>BDRJobStatus</Name>
+      <Link>Base Enums\BDRJobStatus</Link>
+    </Content>
+    <Content Include="AxEnum\BDRJobTrigger">
+      <SubType>Content</SubType>
+      <Name>BDRJobTrigger</Name>
+      <Link>Base Enums\BDRJobTrigger</Link>
+    </Content>
+    <Content Include="AxEnum\BDRMessageType">
+      <SubType>Content</SubType>
+      <Name>BDRMessageType</Name>
+      <Link>Base Enums\BDRMessageType</Link>
+    </Content>
+    <Content Include="AxEnum\BDRTaskStatus">
+      <SubType>Content</SubType>
+      <Name>BDRTaskStatus</Name>
+      <Link>Base Enums\BDRTaskStatus</Link>
+    </Content>
+    <Content Include="AxClass\BDREnvironmentResolver">
+      <SubType>Content</SubType>
+      <Name>BDREnvironmentResolver</Name>
+      <Link>Classes\BDREnvironmentResolver</Link>
+    </Content>
+    <Content Include="AxClass\BDRITaskType">
+      <SubType>Content</SubType>
+      <Name>BDRITaskType</Name>
+      <Link>Classes\BDRITaskType</Link>
+    </Content>
+    <Content Include="AxClass\BDRJobContract">
+      <SubType>Content</SubType>
+      <Name>BDRJobContract</Name>
+      <Link>Classes\BDRJobContract</Link>
+    </Content>
+    <Content Include="AxClass\BDRJobController">
+      <SubType>Content</SubType>
+      <Name>BDRJobController</Name>
+      <Link>Classes\BDRJobController</Link>
+    </Content>
+    <Content Include="AxClass\BDRJobProcessor">
+      <SubType>Content</SubType>
+      <Name>BDRJobProcessor</Name>
+      <Link>Classes\BDRJobProcessor</Link>
+    </Content>
+    <Content Include="AxClass\BDRJobService">
+      <SubType>Content</SubType>
+      <Name>BDRJobService</Name>
+      <Link>Classes\BDRJobService</Link>
+    </Content>
+    <Content Include="AxClass\BDRJobUIBuilder">
+      <SubType>Content</SubType>
+      <Name>BDRJobUIBuilder</Name>
+      <Link>Classes\BDRJobUIBuilder</Link>
+    </Content>
+    <Content Include="AxClass\BDRLookup">
+      <SubType>Content</SubType>
+      <Name>BDRLookup</Name>
+      <Link>Classes\BDRLookup</Link>
+    </Content>
+    <Content Include="AxClass\BDRService">
+      <SubType>Content</SubType>
+      <Name>BDRService</Name>
+      <Link>Classes\BDRService</Link>
+    </Content>
+    <Content Include="AxClass\BDRServiceJobResult">
+      <SubType>Content</SubType>
+      <Name>BDRServiceJobResult</Name>
+      <Link>Classes\BDRServiceJobResult</Link>
+    </Content>
+    <Content Include="AxClass\BDRServiceRunRequest">
+      <SubType>Content</SubType>
+      <Name>BDRServiceRunRequest</Name>
+      <Link>Classes\BDRServiceRunRequest</Link>
+    </Content>
+    <Content Include="AxClass\BDRServiceSecret">
+      <SubType>Content</SubType>
+      <Name>BDRServiceSecret</Name>
+      <Link>Classes\BDRServiceSecret</Link>
+    </Content>
+    <Content Include="AxClass\BDRServiceStatusRequest">
+      <SubType>Content</SubType>
+      <Name>BDRServiceStatusRequest</Name>
+      <Link>Classes\BDRServiceStatusRequest</Link>
+    </Content>
+    <Content Include="AxClass\BDRServiceTaskResult">
+      <SubType>Content</SubType>
+      <Name>BDRServiceTaskResult</Name>
+      <Link>Classes\BDRServiceTaskResult</Link>
+    </Content>
+    <Content Include="AxClass\BDRSetupCopyContract">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCopyContract</Name>
+      <Link>Classes\BDRSetupCopyContract</Link>
+    </Content>
+    <Content Include="AxClass\BDRSetupCopyController">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCopyController</Name>
+      <Link>Classes\BDRSetupCopyController</Link>
+    </Content>
+    <Content Include="AxClass\BDRSetupCopyService">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCopyService</Name>
+      <Link>Classes\BDRSetupCopyService</Link>
+    </Content>
+    <Content Include="AxClass\BDRSetupCopyUIBuilder">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCopyUIBuilder</Name>
+      <Link>Classes\BDRSetupCopyUIBuilder</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskContext">
+      <SubType>Content</SubType>
+      <Name>BDRTaskContext</Name>
+      <Link>Classes\BDRTaskContext</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeAssignRoles">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeAssignRoles</Name>
+      <Link>Classes\BDRTaskTypeAssignRoles</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeBusinessEvents">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeBusinessEvents</Name>
+      <Link>Classes\BDRTaskTypeBusinessEvents</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeCancelWorkflows">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeCancelWorkflows</Name>
+      <Link>Classes\BDRTaskTypeCancelWorkflows</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeDataCleanup">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeDataCleanup</Name>
+      <Link>Classes\BDRTaskTypeDataCleanup</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeEnableUsers">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeEnableUsers</Name>
+      <Link>Classes\BDRTaskTypeEnableUsers</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeFieldValues">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeFieldValues</Name>
+      <Link>Classes\BDRTaskTypeFieldValues</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeRegistration">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeRegistration</Name>
+      <Link>Classes\BDRTaskTypeRegistration</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeRegistrationItem">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeRegistrationItem</Name>
+      <Link>Classes\BDRTaskTypeRegistrationItem</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeReleaseBatchJobs">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeReleaseBatchJobs</Name>
+      <Link>Classes\BDRTaskTypeReleaseBatchJobs</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRBatchJob">
+      <SubType>Content</SubType>
+      <Name>BDRBatchJob</Name>
+      <Link>Display Menu Items\BDRBatchJob</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRCleanupRule">
+      <SubType>Content</SubType>
+      <Name>BDRCleanupRule</Name>
+      <Link>Display Menu Items\BDRCleanupRule</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDREndpoint">
+      <SubType>Content</SubType>
+      <Name>BDREndpoint</Name>
+      <Link>Display Menu Items\BDREndpoint</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDREndpointCreate">
+      <SubType>Content</SubType>
+      <Name>BDREndpointCreate</Name>
+      <Link>Display Menu Items\BDREndpointCreate</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDREnvironment">
+      <SubType>Content</SubType>
+      <Name>BDREnvironment</Name>
+      <Link>Display Menu Items\BDREnvironment</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRFieldValue">
+      <SubType>Content</SubType>
+      <Name>BDRFieldValue</Name>
+      <Link>Display Menu Items\BDRFieldValue</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRJobHistory">
+      <SubType>Content</SubType>
+      <Name>BDRJobHistory</Name>
+      <Link>Display Menu Items\BDRJobHistory</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRJobHistoryPart">
+      <SubType>Content</SubType>
+      <Name>BDRJobHistoryPart</Name>
+      <Link>Display Menu Items\BDRJobHistoryPart</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRParameters">
+      <SubType>Content</SubType>
+      <Name>BDRParameters</Name>
+      <Link>Display Menu Items\BDRParameters</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRSetupCompany">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCompany</Name>
+      <Link>Display Menu Items\BDRSetupCompany</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRTaskType">
+      <SubType>Content</SubType>
+      <Name>BDRTaskType</Name>
+      <Link>Display Menu Items\BDRTaskType</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRUserRole">
+      <SubType>Content</SubType>
+      <Name>BDRUserRole</Name>
+      <Link>Display Menu Items\BDRUserRole</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRUserToEnable">
+      <SubType>Content</SubType>
+      <Name>BDRUserToEnable</Name>
+      <Link>Display Menu Items\BDRUserToEnable</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRWorkflowCancel">
+      <SubType>Content</SubType>
+      <Name>BDRWorkflowCancel</Name>
+      <Link>Display Menu Items\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRWorkspace">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspace</Name>
+      <Link>Display Menu Items\BDRWorkspace</Link>
+    </Content>
+    <Content Include="AxEdt\BDREnvironmentId">
+      <SubType>Content</SubType>
+      <Name>BDREnvironmentId</Name>
+      <Link>Extended Data Types\BDREnvironmentId</Link>
+    </Content>
+    <Content Include="AxEdt\BDRFieldValueText">
+      <SubType>Content</SubType>
+      <Name>BDRFieldValueText</Name>
+      <Link>Extended Data Types\BDRFieldValueText</Link>
+    </Content>
+    <Content Include="AxEdt\BDRJobRecId">
+      <SubType>Content</SubType>
+      <Name>BDRJobRecId</Name>
+      <Link>Extended Data Types\BDRJobRecId</Link>
+    </Content>
+    <Content Include="AxEdt\BDRJobTimeoutHours">
+      <SubType>Content</SubType>
+      <Name>BDRJobTimeoutHours</Name>
+      <Link>Extended Data Types\BDRJobTimeoutHours</Link>
+    </Content>
+    <Content Include="AxEdt\BDRKeepDays">
+      <SubType>Content</SubType>
+      <Name>BDRKeepDays</Name>
+      <Link>Extended Data Types\BDRKeepDays</Link>
+    </Content>
+    <Content Include="AxEdt\BDRKeyValue">
+      <SubType>Content</SubType>
+      <Name>BDRKeyValue</Name>
+      <Link>Extended Data Types\BDRKeyValue</Link>
+    </Content>
+    <Content Include="AxEdt\BDRMessage">
+      <SubType>Content</SubType>
+      <Name>BDRMessage</Name>
+      <Link>Extended Data Types\BDRMessage</Link>
+    </Content>
+    <Content Include="AxEdt\BDRRecordsAffected">
+      <SubType>Content</SubType>
+      <Name>BDRRecordsAffected</Name>
+      <Link>Extended Data Types\BDRRecordsAffected</Link>
+    </Content>
+    <Content Include="AxEdt\BDRRequestId">
+      <SubType>Content</SubType>
+      <Name>BDRRequestId</Name>
+      <Link>Extended Data Types\BDRRequestId</Link>
+    </Content>
+    <Content Include="AxEdt\BDRResourceName">
+      <SubType>Content</SubType>
+      <Name>BDRResourceName</Name>
+      <Link>Extended Data Types\BDRResourceName</Link>
+    </Content>
+    <Content Include="AxEdt\BDRSecretName">
+      <SubType>Content</SubType>
+      <Name>BDRSecretName</Name>
+      <Link>Extended Data Types\BDRSecretName</Link>
+    </Content>
+    <Content Include="AxEdt\BDRSecurityRoleName">
+      <SubType>Content</SubType>
+      <Name>BDRSecurityRoleName</Name>
+      <Link>Extended Data Types\BDRSecurityRoleName</Link>
+    </Content>
+    <Content Include="AxEdt\BDRSequence">
+      <SubType>Content</SubType>
+      <Name>BDRSequence</Name>
+      <Link>Extended Data Types\BDRSequence</Link>
+    </Content>
+    <Content Include="AxEdt\BDRTaskTypeName">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeName</Name>
+      <Link>Extended Data Types\BDRTaskTypeName</Link>
+    </Content>
+    <Content Include="AxForm\BDRBatchJob">
+      <SubType>Content</SubType>
+      <Name>BDRBatchJob</Name>
+      <Link>Forms\BDRBatchJob</Link>
+    </Content>
+    <Content Include="AxForm\BDRCleanupRule">
+      <SubType>Content</SubType>
+      <Name>BDRCleanupRule</Name>
+      <Link>Forms\BDRCleanupRule</Link>
+    </Content>
+    <Content Include="AxForm\BDREndpoint">
+      <SubType>Content</SubType>
+      <Name>BDREndpoint</Name>
+      <Link>Forms\BDREndpoint</Link>
+    </Content>
+    <Content Include="AxForm\BDREndpointCreate">
+      <SubType>Content</SubType>
+      <Name>BDREndpointCreate</Name>
+      <Link>Forms\BDREndpointCreate</Link>
+    </Content>
+    <Content Include="AxForm\BDREnvironment">
+      <SubType>Content</SubType>
+      <Name>BDREnvironment</Name>
+      <Link>Forms\BDREnvironment</Link>
+    </Content>
+    <Content Include="AxForm\BDRFieldValue">
+      <SubType>Content</SubType>
+      <Name>BDRFieldValue</Name>
+      <Link>Forms\BDRFieldValue</Link>
+    </Content>
+    <Content Include="AxForm\BDRJobHistory">
+      <SubType>Content</SubType>
+      <Name>BDRJobHistory</Name>
+      <Link>Forms\BDRJobHistory</Link>
+    </Content>
+    <Content Include="AxForm\BDRJobHistoryPart">
+      <SubType>Content</SubType>
+      <Name>BDRJobHistoryPart</Name>
+      <Link>Forms\BDRJobHistoryPart</Link>
+    </Content>
+    <Content Include="AxForm\BDRParameters">
+      <SubType>Content</SubType>
+      <Name>BDRParameters</Name>
+      <Link>Forms\BDRParameters</Link>
+    </Content>
+    <Content Include="AxForm\BDRSetupCompany">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCompany</Name>
+      <Link>Forms\BDRSetupCompany</Link>
+    </Content>
+    <Content Include="AxForm\BDRTaskType">
+      <SubType>Content</SubType>
+      <Name>BDRTaskType</Name>
+      <Link>Forms\BDRTaskType</Link>
+    </Content>
+    <Content Include="AxForm\BDRUserRole">
+      <SubType>Content</SubType>
+      <Name>BDRUserRole</Name>
+      <Link>Forms\BDRUserRole</Link>
+    </Content>
+    <Content Include="AxForm\BDRUserToEnable">
+      <SubType>Content</SubType>
+      <Name>BDRUserToEnable</Name>
+      <Link>Forms\BDRUserToEnable</Link>
+    </Content>
+    <Content Include="AxForm\BDRWorkflowCancel">
+      <SubType>Content</SubType>
+      <Name>BDRWorkflowCancel</Name>
+      <Link>Forms\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxForm\BDRWorkspace">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspace</Name>
+      <Link>Forms\BDRWorkspace</Link>
+    </Content>
+    <Content Include="AxLabelFile\BDR_de">
+      <SubType>Content</SubType>
+      <Name>BDR_de</Name>
+      <Link>Label Files\BDR_de</Link>
+    </Content>
+    <Content Include="AxLabelFile\BDR_en-US">
+      <SubType>Content</SubType>
+      <Name>BDR_en-US</Name>
+      <Link>Label Files\BDR_en-US</Link>
+    </Content>
+    <Content Include="AxMenuExtension\MainMenu.BDR">
+      <SubType>Content</SubType>
+      <Name>MainMenu.BDR</Name>
+      <Link>Menu Extensions\MainMenu.BDR</Link>
+    </Content>
+    <Content Include="AxMenuExtension\SystemAdministration.BDR">
+      <SubType>Content</SubType>
+      <Name>SystemAdministration.BDR</Name>
+      <Link>Menu Extensions\SystemAdministration.BDR</Link>
+    </Content>
+    <Content Include="AxMenu\BDR">
+      <SubType>Content</SubType>
+      <Name>BDR</Name>
+      <Link>Menus\BDR</Link>
+    </Content>
+    <Content Include="AxSecurityDuty\BDRWorkspaceMaintain">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspaceMaintain</Name>
+      <Link>Security Duties\BDRWorkspaceMaintain</Link>
+    </Content>
+    <Content Include="AxSecurityDuty\BDRWorkspaceView">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspaceView</Name>
+      <Link>Security Duties\BDRWorkspaceView</Link>
+    </Content>
+    <Content Include="AxSecurityPrivilege\BDRServiceInvoke">
+      <SubType>Content</SubType>
+      <Name>BDRServiceInvoke</Name>
+      <Link>Security Privileges\BDRServiceInvoke</Link>
+    </Content>
+    <Content Include="AxSecurityPrivilege\BDRWorkspaceMaintain">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspaceMaintain</Name>
+      <Link>Security Privileges\BDRWorkspaceMaintain</Link>
+    </Content>
+    <Content Include="AxSecurityPrivilege\BDRWorkspaceView">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspaceView</Name>
+      <Link>Security Privileges\BDRWorkspaceView</Link>
+    </Content>
+    <Content Include="AxSecurityRole\BDRAdministrator">
+      <SubType>Content</SubType>
+      <Name>BDRAdministrator</Name>
+      <Link>Security Roles\BDRAdministrator</Link>
+    </Content>
+    <Content Include="AxServiceGroup\BDRServices">
+      <SubType>Content</SubType>
+      <Name>BDRServices</Name>
+      <Link>Service Groups\BDRServices</Link>
+    </Content>
+    <Content Include="AxService\BDRService">
+      <SubType>Content</SubType>
+      <Name>BDRService</Name>
+      <Link>Services\BDRService</Link>
+    </Content>
+    <Content Include="AxTable\BDRBatchJob">
+      <SubType>Content</SubType>
+      <Name>BDRBatchJob</Name>
+      <Link>Tables\BDRBatchJob</Link>
+    </Content>
+    <Content Include="AxTable\BDRCleanupRule">
+      <SubType>Content</SubType>
+      <Name>BDRCleanupRule</Name>
+      <Link>Tables\BDRCleanupRule</Link>
+    </Content>
+    <Content Include="AxTable\BDREndpoint">
+      <SubType>Content</SubType>
+      <Name>BDREndpoint</Name>
+      <Link>Tables\BDREndpoint</Link>
+    </Content>
+    <Content Include="AxTable\BDREndpointEvent">
+      <SubType>Content</SubType>
+      <Name>BDREndpointEvent</Name>
+      <Link>Tables\BDREndpointEvent</Link>
+    </Content>
+    <Content Include="AxTable\BDREnvironment">
+      <SubType>Content</SubType>
+      <Name>BDREnvironment</Name>
+      <Link>Tables\BDREnvironment</Link>
+    </Content>
+    <Content Include="AxTable\BDREnvironmentTask">
+      <SubType>Content</SubType>
+      <Name>BDREnvironmentTask</Name>
+      <Link>Tables\BDREnvironmentTask</Link>
+    </Content>
+    <Content Include="AxTable\BDRFieldValue">
+      <SubType>Content</SubType>
+      <Name>BDRFieldValue</Name>
+      <Link>Tables\BDRFieldValue</Link>
+    </Content>
+    <Content Include="AxTable\BDRJobHistory">
+      <SubType>Content</SubType>
+      <Name>BDRJobHistory</Name>
+      <Link>Tables\BDRJobHistory</Link>
+    </Content>
+    <Content Include="AxTable\BDRLookupTmp">
+      <SubType>Content</SubType>
+      <Name>BDRLookupTmp</Name>
+      <Link>Tables\BDRLookupTmp</Link>
+    </Content>
+    <Content Include="AxTable\BDRMessageLog">
+      <SubType>Content</SubType>
+      <Name>BDRMessageLog</Name>
+      <Link>Tables\BDRMessageLog</Link>
+    </Content>
+    <Content Include="AxTable\BDRParameters">
+      <SubType>Content</SubType>
+      <Name>BDRParameters</Name>
+      <Link>Tables\BDRParameters</Link>
+    </Content>
+    <Content Include="AxTable\BDRSetupCompany">
+      <SubType>Content</SubType>
+      <Name>BDRSetupCompany</Name>
+      <Link>Tables\BDRSetupCompany</Link>
+    </Content>
+    <Content Include="AxTable\BDRTaskHistory">
+      <SubType>Content</SubType>
+      <Name>BDRTaskHistory</Name>
+      <Link>Tables\BDRTaskHistory</Link>
+    </Content>
+    <Content Include="AxTable\BDRTaskType">
+      <SubType>Content</SubType>
+      <Name>BDRTaskType</Name>
+      <Link>Tables\BDRTaskType</Link>
+    </Content>
+    <Content Include="AxTable\BDRUserRole">
+      <SubType>Content</SubType>
+      <Name>BDRUserRole</Name>
+      <Link>Tables\BDRUserRole</Link>
+    </Content>
+    <Content Include="AxTable\BDRUserToEnable">
+      <SubType>Content</SubType>
+      <Name>BDRUserToEnable</Name>
+      <Link>Tables\BDRUserToEnable</Link>
+    </Content>
+    <Content Include="AxTable\BDRWorkflowCancel">
+      <SubType>Content</SubType>
+      <Name>BDRWorkflowCancel</Name>
+      <Link>Tables\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxTile\BDRWorkspace">
+      <SubType>Content</SubType>
+      <Name>BDRWorkspace</Name>
+      <Link>Tiles\BDRWorkspace</Link>
+    </Content>
+    <Content Include="BDR.de.label.txt">
+      <SubType>Content</SubType>
+      <Name>BDR.de.label.txt</Name>
+      <DependentUpon>AxLabelFile\BDR_de</DependentUpon>
+    </Content>
+    <Content Include="BDR.en-US.label.txt">
+      <SubType>Content</SubType>
+      <Name>BDR.en-US.label.txt</Name>
+      <DependentUpon>AxLabelFile\BDR_en-US</DependentUpon>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.Common.targets" />
+  <Import Project="$(BuildTasksDirectory)\Microsoft.Dynamics.Framework.Tools.BuildTasks.17.0.targets" />
+</Project>

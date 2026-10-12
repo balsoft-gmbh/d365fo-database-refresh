@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRSetupCopyController</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Opens the Copy setup dialog. The selected environment is the source.
+/// </summary>
+public final class BDRSetupCopyController extends SysOperationServiceController
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+
+    protected void new()
+    {
+        super(classStr(BDRSetupCopyService), methodStr(BDRSetupCopyService, process), SysOperationExecutionMode::Synchronous);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+
+    public static BDRSetupCopyController construct()
+    {
+        return new BDRSetupCopyController();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+
+    public static void main(Args _args)
+    {
+        BDRSetupCopyController controller = BDRSetupCopyController::construct();
+
+        // Start with an empty dialog; a remembered target from the last copy is easy to miss.
+        controller.parmLoadFromSysLastValue(false);
+
+        BDRSetupCopyContract contract = controller.getDataContractObject() as BDRSetupCopyContract;
+
+        if (!_args || !_args.record() || _args.record().TableId != tableNum(BDREnvironment))
+        {
+            throw error("@BDR:ErrOpenFromEnvironment");
+        }
+
+        BDREnvironment environment = _args.record();
+        contract.parmSourceEnvironmentId(environment.EnvironmentId);
+        contract.parmTargetEnvironmentId('');
+
+        controller.parmArgs(_args);
+        controller.parmDialogCaption(strFmt('%1: %2', "@BDR:CopySetup", environment.EnvironmentId));
+        controller.startOperation();
+
+        if (_args && _args.caller() is FormRun)
+        {
+            FormRun caller = _args.caller();
+            caller.dataSource(1).research(true);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>defaultCaption</Name>
+				<Source><![CDATA[
+
+    public ClassDescription defaultCaption()
+    {
+        return "@BDR:CopySetup";
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canGoBatch</Name>
+				<Source><![CDATA[
+
+    public boolean canGoBatch()
+    {
+        return false;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

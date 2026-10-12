@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRService</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Custom service for pipelines that call database refresh after a copy:
+/// POST /api/services/BDRServices/BDRService/run
+/// POST /api/services/BDRServices/BDRService/getJobStatus
+/// </summary>
+/// <remarks>
+/// A failed job is returned as an error (HTTP 500) by default, so a pipeline that only checks the
+/// status code does not open the environment to users after a failed run. With
+/// ReturnResultOnFailure the job result is returned instead and the caller checks Succeeded.
+/// With RunInBatch the call returns at once and the caller polls getJobStatus until Finished.
+/// </remarks>
+public final class BDRService
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs the active tasks of the environment, or returns the job started earlier with the same request ID.
+    /// </summary>
+    /// <param name = "_request">Environment, optional task filter, request ID, batch mode and secrets for this run.</param>
+    /// <returns>The job result.</returns>
+    public BDRServiceJobResult run(BDRServiceRunRequest _request)
+    {
+        BDRJobHistory jobHistory = BDRJobProcessor::run(
+            _request.parmEnvironmentId(),
+            BDRJobTrigger::Service,
+            _request.secretMap(),
+            _request.taskFilter(),
+            _request.parmRequestId(),
+            _request.parmRunInBatch());
+
+        if (!_request.parmReturnResultOnFailure()
+            && (jobHistory.Status == BDRJobStatus::Failed || jobHistory.Status == BDRJobStatus::PartlySucceeded))
+        {
+            throw error(strFmt("@BDR:ErrJobFailedTasks", jobHistory.RecId, jobHistory.Status, jobHistory.failedTasks()));
+        }
+
+        return BDRServiceJobResult::newFromJob(jobHistory);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getJobStatus</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns the status of a job and its tasks, for example to poll the batch part of a job.
+    /// </summary>
+    /// <param name = "_request">The job ID, or the request ID the job was started with.</param>
+    /// <returns>The job result.</returns>
+    public BDRServiceJobResult getJobStatus(BDRServiceStatusRequest _request)
+    {
+        BDRJobHistory jobHistory;
+
+        if (_request.parmJobId())
+        {
+            jobHistory = BDRJobHistory::find(_request.parmJobId());
+        }
+        else if (_request.parmRequestId())
+        {
+            jobHistory = BDRJobHistory::findByRequestId(_request.parmRequestId(), _request.parmEnvironmentId());
+        }
+        else
+        {
+            throw error("@BDR:ErrJobIdOrRequestId");
+        }
+
+        if (!jobHistory.RecId)
+        {
+            throw error(strFmt("@BDR:ErrJobNotFound", _request.parmJobId() ? int642Str(_request.parmJobId()) : _request.parmRequestId()));
+        }
+
+        return BDRServiceJobResult::newFromJob(jobHistory);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

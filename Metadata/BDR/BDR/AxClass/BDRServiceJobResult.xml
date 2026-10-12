@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServiceJobResult</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Result of a database refresh job, returned by run and getJobStatus.
+/// </summary>
+[DataContractAttribute]
+public final class BDRServiceJobResult
+{
+    private RefRecId jobId;
+    private BDREnvironmentId environmentId;
+    private str status;
+    private str message;
+    private boolean succeeded;
+    private boolean finished;
+    private BDRRequestId requestId;
+    private List tasks;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>newFromJob</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Builds the response from a job and its task history.
+    /// </summary>
+    /// <param name = "_jobHistory">The job.</param>
+    /// <returns>The response.</returns>
+    public static BDRServiceJobResult newFromJob(BDRJobHistory _jobHistory)
+    {
+        BDRServiceJobResult response = new BDRServiceJobResult();
+        BDRTaskHistory taskHistory;
+
+        response.jobId = _jobHistory.RecId;
+        response.environmentId = _jobHistory.EnvironmentId;
+        response.status = enum2Symbol(enumNum(BDRJobStatus), _jobHistory.Status);
+        response.message = _jobHistory.Message;
+        response.succeeded = _jobHistory.Status == BDRJobStatus::Succeeded;
+        response.finished = _jobHistory.isFinished();
+        response.requestId = _jobHistory.RequestId;
+        List taskResults = new List(Types::Class);
+
+        while select taskHistory
+            order by Sequence
+            where taskHistory.JobHistory == _jobHistory.RecId
+        {
+            taskResults.addEnd(BDRServiceTaskResult::newFromTaskHistory(taskHistory));
+        }
+
+        response.tasks = taskResults;
+
+        return response;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmJobId</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('JobId')]
+    public RefRecId parmJobId(RefRecId _jobId = jobId)
+    {
+        jobId = _jobId;
+        return jobId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmEnvironmentId</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('EnvironmentId')]
+    public BDREnvironmentId parmEnvironmentId(BDREnvironmentId _environmentId = environmentId)
+    {
+        environmentId = _environmentId;
+        return environmentId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmStatus</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Waiting, Running, Scheduled, Succeeded, PartlySucceeded or Failed.
+    /// </summary>
+    [DataMemberAttribute('Status')]
+    public str parmStatus(str _status = status)
+    {
+        status = _status;
+        return status;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmMessage</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('Message')]
+    public str parmMessage(str _message = message)
+    {
+        message = _message;
+        return message;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmSucceeded</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// True when the job and all its tasks succeeded.
+    /// </summary>
+    [DataMemberAttribute('Succeeded')]
+    public boolean parmSucceeded(boolean _succeeded = succeeded)
+    {
+        succeeded = _succeeded;
+        return succeeded;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmFinished</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// True when the job has finished, including its batch part; false while it runs or is scheduled.
+    /// </summary>
+    [DataMemberAttribute('Finished')]
+    public boolean parmFinished(boolean _finished = finished)
+    {
+        finished = _finished;
+        return finished;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRequestId</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('RequestId')]
+    public BDRRequestId parmRequestId(BDRRequestId _requestId = requestId)
+    {
+        requestId = _requestId;
+        return requestId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmTasks</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('Tasks'),
+     AifCollectionTypeAttribute('_tasks', Types::Class, classStr(BDRServiceTaskResult)),
+     AifCollectionTypeAttribute('return', Types::Class, classStr(BDRServiceTaskResult))]
+    public List parmTasks(List _tasks = tasks)
+    {
+        tasks = _tasks;
+        return tasks;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

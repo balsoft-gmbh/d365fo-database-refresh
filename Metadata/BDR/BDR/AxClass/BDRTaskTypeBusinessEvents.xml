@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeBusinessEvents</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Creates the business event endpoints of the environment and activates their business events.
+/// The copy removes all endpoints, so they have to be created again in every refreshed environment.
+/// </summary>
+/// <remarks>
+/// The Azure application secret is taken from the secrets passed to the service call, so it is
+/// never stored in a setup table. Endpoints are created through the standard endpoint tables;
+/// the connection test can be skipped like the standard endpoint data entity does.
+/// </remarks>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'BusinessEvents')]
+public final class BDRTaskTypeBusinessEvents implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'BusinessEvents';
+
+    private BDRTaskContext context;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeBusinessEvents::Name, literalStr("@BDR:TaskBusinessEvents"), 50, false, menuItemDisplayStr(BDREndpoint));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BDREndpoint endpoint;
+
+        context = _context;
+
+        while select endpoint
+            where endpoint.EnvironmentId == environmentId
+        {
+            RefRecId endpointRecId = this.existingEndpoint(endpoint.EndpointName);
+
+            if (endpointRecId)
+            {
+                context.logInfo(strFmt("@BDR:MsgEndpointExists", endpoint.EndpointName));
+            }
+            else
+            {
+                endpointRecId = this.createEndpoint(endpoint);
+            }
+
+            if (endpointRecId)
+            {
+                this.activateEvents(endpoint, endpointRecId);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>existingEndpoint</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Finds Microsoft's endpoint by name in the database.
+    /// </summary>
+    /// <param name = "_endpointName">The endpoint name.</param>
+    /// <returns>The RecId of the endpoint, or 0.</returns>
+    /// <remarks>
+    /// <c>BusinessEventsEndpoint::findByName</c> goes through the record cache of the endpoint tables
+    /// (FoundAndEmpty, table inheritance). After an endpoint was deleted in the Business events workspace it
+    /// could still return the deleted record, so the task skipped the endpoint and activated events for a
+    /// RecId that no longer exists.
+    /// </remarks>
+    private RefRecId existingEndpoint(BusinessEventsEndpointName _endpointName)
+    {
+        BusinessEventsEndpoint standardEndpoint;
+
+        standardEndpoint.disableCache(true);
+        select firstonly RecId from standardEndpoint
+            where standardEndpoint.Name == _endpointName;
+
+        return standardEndpoint.RecId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createEndpoint</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates an endpoint of the configured type.
+    /// </summary>
+    /// <returns>The record ID of the new endpoint, 0 if it could not be created.</returns>
+    private RefRecId createEndpoint(BDREndpoint _endpoint)
+    {
+        if (!BDREndpoint::isSupportedType(_endpoint.EndpointType))
+        {
+            context.logWarning(strFmt("@BDR:ErrValueConversion", enum2Str(_endpoint.EndpointType), fieldStr(BDREndpoint, EndpointType)));
+            return 0;
+        }
+
+        BusinessEventsAzureEndpoint azureEndpoint = _endpoint.standardEndpoint(_endpoint.SecretName ? context.secret(_endpoint.SecretName) : '');
+
+        using (var validationScope = new BusinessEventsEndpointValidationScope(!_endpoint.ValidateConnection))
+        {
+            ttsbegin;
+
+            if (!azureEndpoint.validateWrite())
+            {
+                ttsabort;
+                context.logError(BDRJobProcessor::infologText(infologLine() - 1));
+                return 0;
+            }
+
+            azureEndpoint.insert();
+
+            ttscommit;
+        }
+
+        context.addRecordsAffected(1);
+        context.logInfo(strFmt("@BDR:MsgEndpointCreated", _endpoint.EndpointName));
+
+        return azureEndpoint.RecId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>activateEvents</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Activates the business events of an endpoint in the companies of the endpoint.
+    /// </summary>
+    private void activateEvents(BDREndpoint _endpoint, RefRecId _endpointRecId)
+    {
+        BDREndpointEvent endpointEvent;
+        Set companies = _endpoint.companies();
+
+        if (!companies.elements())
+        {
+            context.logWarning(strFmt("@BDR:MsgNoCompaniesSkipped", _endpoint.EndpointName));
+            return;
+        }
+
+        while select endpointEvent
+            where endpointEvent.EnvironmentId == _endpoint.EnvironmentId
+                && endpointEvent.EndpointName == _endpoint.EndpointName
+        {
+            if (!BusinessEventsTable::find(endpointEvent.BusinessEventId).RecId)
+            {
+                context.logWarning(strFmt("@BDR:ErrInvalidTable", endpointEvent.BusinessEventId));
+                continue;
+            }
+
+            SetEnumerator enumerator = companies.getEnumerator();
+
+            while (enumerator.moveNext())
+            {
+                this.activateEvent(endpointEvent.BusinessEventId, enumerator.current(), _endpointRecId);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>activateEvent</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Activates one business event for one company, unless it is active already.
+    /// </summary>
+    private void activateEvent(BusinessEventsId _businessEventId, DataAreaId _company, RefRecId _endpointRecId)
+    {
+        BusinessEventsConfiguration configuration;
+
+        select firstonly RecId from configuration
+            where configuration.BusinessEventsTable == _businessEventId
+                && configuration.LegalEntity == _company
+                && configuration.BusinessEventsEndpoint == _endpointRecId;
+
+        if (configuration.RecId)
+        {
+            return;
+        }
+
+        configuration.clear();
+        configuration.BusinessEventsTable = _businessEventId;
+        configuration.LegalEntity = _company;
+        configuration.BusinessEventsEndpoint = _endpointRecId;
+
+        ttsbegin;
+
+        if (configuration.validateWrite())
+        {
+            configuration.insert();
+            context.addRecordsAffected(1);
+            context.logInfo(strFmt("@BDR:MsgEventActivated", _businessEventId, _company));
+        }
+        else
+        {
+            context.logError(BDRJobProcessor::infologText(infologLine() - 1));
+        }
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

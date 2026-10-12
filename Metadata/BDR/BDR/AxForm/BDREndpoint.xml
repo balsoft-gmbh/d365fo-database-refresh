@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDREndpoint</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDREndpoint extends FormRun
+{
+    BDREnvironment environment;
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        if (element.args() && element.args().record() && element.args().record().TableId == tableNum(BDREnvironment))
+        {
+            environment = element.args().record();
+        }
+
+        if (!environment.RecId)
+        {
+            throw error("@BDR:ErrOpenFromEnvironment");
+        }
+
+        super();
+
+        element.design().caption(strFmt('%1: %2', element.design().caption(), environment.EnvironmentId));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>setEndpointRecId</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Called by the endpoint dialog: shows the new or changed endpoint.
+    /// </summary>
+    /// <param name = "_endpointRecId">The endpoint.</param>
+    public void setEndpointRecId(RecId _endpointRecId)
+    {
+        BDREndpoint endpoint;
+
+        BDREndpoint_ds.research();
+
+        select firstonly endpoint
+            where endpoint.RecId == _endpointRecId;
+
+        if (endpoint.RecId)
+        {
+            BDREndpoint_ds.positionToRecord(endpoint);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>openEndpointDialog</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Opens the endpoint dialog: for a new endpoint of the environment, or to edit an endpoint.
+    /// </summary>
+    /// <param name = "_record">The environment or the endpoint.</param>
+    public void openEndpointDialog(Common _record)
+    {
+        Args args = new Args();
+
+        args.record(_record);
+        args.caller(element);
+
+        new MenuFunction(menuItemDisplayStr(BDREndpointCreate), MenuItemType::Display).run(args);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateCompanies</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Companies can be chosen when the row is saved and not for all companies.
+    /// </summary>
+    public void updateCompanies()
+    {
+        boolean canChoose = BDREndpoint.canChooseCompanies();
+
+        BDREndpoint_ds.object(fieldNum(BDREndpoint, AllCompanies)).allowEdit(canChoose);
+        EndpointCompanies.enabled(canChoose && BDREndpoint.RecId && !BDREndpoint.AllCompanies);
+
+        EditEndpoint.enabled(BDREndpoint.RecId != 0);
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDREndpoint</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                QueryBuildRange range = this.queryBuildDataSource().addRange(fieldNum(BDREndpoint, EnvironmentId));
+                range.value(queryValue(environment.EnvironmentId));
+                range.status(RangeStatus::Locked);
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            if (environment.RecId)
+            {
+                BDREndpoint.EnvironmentId = environment.EnvironmentId;
+            }
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            BDREndpointEvent_ds.executeQuery();
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+			<DataSource>
+				<Name>BDREndpointEvent</Name>
+				<Methods>
+					<Method>
+						<Name>executeQuery</Name>
+						<Source><![CDATA[
+        public void executeQuery()
+        {
+            SysQuery::findOrCreateRange(this.queryBuildDataSource(), fieldNum(BDREndpointEvent, EnvironmentId)).value(
+                BDREndpoint.EnvironmentId ? queryValue(BDREndpoint.EnvironmentId) : SysQuery::valueEmptyString());
+            SysQuery::findOrCreateRange(this.queryBuildDataSource(), fieldNum(BDREndpointEvent, EndpointName)).value(
+                BDREndpoint.EndpointName ? queryValue(BDREndpoint.EndpointName) : SysQuery::valueEmptyString());
+
+            super();
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            BDREndpointEvent.EnvironmentId = BDREndpoint.EnvironmentId;
+            BDREndpointEvent.EndpointName = BDREndpoint.EndpointName;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>NewEndpoint</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            super();
+
+            element.openEndpointDialog(environment);
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>EditEndpoint</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            super();
+
+            if (BDREndpoint.RecId)
+            {
+                element.openEndpointDialog(BDREndpoint);
+            }
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>EventsGrid_BusinessEventId</Name>
+				<Type>String</Type>
+				<Methods>
+					<Method>
+						<Name>lookup</Name>
+						<Source><![CDATA[
+        public void lookup()
+        {
+            BDRLookup::lookupBusinessEvent(this);
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>EndpointGrid_AllCompanies</Name>
+				<Type>CheckBox</Type>
+				<Methods>
+					<Method>
+						<Name>modified</Name>
+						<Source><![CDATA[
+        public boolean modified()
+        {
+            boolean ret = super();
+
+            // Save at once: All companies removes the selected companies and enables Companies.
+            BDREndpoint_ds.write();
+            BDREndpoint_ds.refresh();
+            element.updateCompanies();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDREndpoint</Name>
+			<Table>BDREndpoint</Table>
+			<AllowCreate>No</AllowCreate>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+		<AxFormDataSource xmlns="">
+			<Name>BDREndpointEvent</Name>
+			<Table>BDREndpointEvent</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<JoinSource>BDREndpoint</JoinSource>
+			<LinkType>Delayed</LinkType>
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:Endpoints</Caption>
+		<DataSource xmlns="">BDREndpoint</DataSource>
+		<Pattern xmlns="">Custom</Pattern>
+		<ShowNewButton xmlns="">No</ShowNewButton>
+		<TitleDataSource xmlns="">BDREndpoint</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormActionPaneControl">
+				<Name>ActionPane</Name>
+				<Type>ActionPane</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonGroupControl">
+						<Name>EndpointGroup</Name>
+						<Type>ButtonGroup</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonControl">
+								<Name>NewEndpoint</Name>
+								<Type>Button</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<NormalImage>New</NormalImage>
+								<Text>@BDR:NewEndpoint</Text>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonControl">
+								<Name>EditEndpoint</Name>
+								<AutoDeclaration>Yes</AutoDeclaration>
+								<Type>Button</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<NormalImage>Edit</NormalImage>
+								<Text>@BDR:EditEndpoint</Text>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>EndpointCompanies</Name>
+								<AutoDeclaration>Yes</AutoDeclaration>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataSource>BDREndpoint</DataSource>
+								<MenuItemName>BDRSetupCompany</MenuItemName>
+								<NeedsRecord>Yes</NeedsRecord>
+								<Text>@BDR:SetupCompanies</Text>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDREndpoint</DataSource>
+					</AxFormControl>
+				</Controls>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>EndpointsGroup</Name>
+				<HeightMode>SizeToAvailable</HeightMode>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormGridControl">
+						<Name>EndpointGrid</Name>
+						<HeightMode>SizeToAvailable</HeightMode>
+						<Type>Grid</Type>
+						<WidthMode>SizeToAvailable</WidthMode>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EndpointGrid_EndpointName</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>EndpointName</DataField>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormComboBoxControl">
+								<Name>EndpointGrid_EndpointType</Name>
+								<AllowEdit>No</AllowEdit>
+								<Type>ComboBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>EndpointType</DataField>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EndpointGrid_Description</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Description</DataField>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormCheckBoxControl">
+								<Name>EndpointGrid_AllCompanies</Name>
+								<Type>CheckBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>AllCompanies</DataField>
+								<DataSource>BDREndpoint</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EndpointGrid_companyScope</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataMethod>companyScope</DataMethod>
+								<DataSource>BDREndpoint</DataSource>
+								<Label>@BDR:SelectedCompanies</Label>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDREndpoint</DataSource>
+						<Style>Tabular</Style>
+					</AxFormControl>
+				</Controls>
+				<Caption>@BDR:Endpoints</Caption>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>EventsGroup</Name>
+				<HeightMode>SizeToAvailable</HeightMode>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormActionPaneControl">
+						<Name>EventsStrip</Name>
+						<Type>ActionPane</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonGroupControl">
+								<Name>EventsStripGroup</Name>
+								<Type>ButtonGroup</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Controls>
+									<AxFormControl xmlns=""
+										i:type="AxFormCommandButtonControl">
+										<Name>EventNew</Name>
+										<Type>CommandButton</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<Command>New</Command>
+										<NormalImage>New</NormalImage>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormCommandButtonControl">
+										<Name>EventDelete</Name>
+										<Type>CommandButton</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<Command>DeleteRecord</Command>
+										<NeedsRecord>Yes</NeedsRecord>
+										<NormalImage>Delete</NormalImage>
+									</AxFormControl>
+								</Controls>
+								<DataSource>BDREndpointEvent</DataSource>
+							</AxFormControl>
+						</Controls>
+						<Style>Strip</Style>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormGridControl">
+						<Name>EventsGrid</Name>
+						<HeightMode>SizeToAvailable</HeightMode>
+						<Type>Grid</Type>
+						<WidthMode>SizeToAvailable</WidthMode>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EventsGrid_BusinessEventId</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>BusinessEventId</DataField>
+								<DataSource>BDREndpointEvent</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EventsGrid_eventName</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataMethod>eventName</DataMethod>
+								<DataSource>BDREndpointEvent</DataSource>
+								<Label>@BDR:BusinessEventName</Label>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>EventsGrid_eventModule</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataMethod>eventModule</DataMethod>
+								<DataSource>BDREndpointEvent</DataSource>
+								<Label>@BDR:BusinessEventModule</Label>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDREndpointEvent</DataSource>
+						<Style>Tabular</Style>
+					</AxFormControl>
+				</Controls>
+				<Caption>@BDR:EndpointEvents</Caption>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

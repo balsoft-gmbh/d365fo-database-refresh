@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobController</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Starts a database refresh job from the menu, the workspace or as a batch job.
+/// </summary>
+public final class BDRJobController extends SysOperationServiceController
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+
+    protected void new()
+    {
+        super(classStr(BDRJobService), methodStr(BDRJobService, process), SysOperationExecutionMode::Synchronous);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates the controller.
+    /// </summary>
+    /// <param name = "_executionMode">Synchronous for the menu, scheduled batch for the service.</param>
+    /// <returns>The controller.</returns>
+    public static BDRJobController construct(SysOperationExecutionMode _executionMode = SysOperationExecutionMode::Synchronous)
+    {
+        BDRJobController controller = new BDRJobController();
+
+        controller.parmExecutionMode(_executionMode);
+
+        return controller;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+
+    public static void main(Args _args)
+    {
+        BDRJobController controller = BDRJobController::construct();
+        controller.parmLoadFromSysLastValue(false);
+        BDREnvironment bdrEnvironment = BDREnvironmentResolver::resolve();
+        BDRJobContract bdrJobContract = controller.getDataContractObject() as BDRJobContract;
+        bdrJobContract.parmEnvironmentId(bdrEnvironment.EnvironmentId);
+        controller.parmArgs(_args);
+        controller.startOperation();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>defaultCaption</Name>
+				<Source><![CDATA[
+
+    public ClassDescription defaultCaption()
+    {
+        return "@BDR:RunJob";
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canGoBatch</Name>
+				<Source><![CDATA[
+
+    public boolean canGoBatch()
+    {
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

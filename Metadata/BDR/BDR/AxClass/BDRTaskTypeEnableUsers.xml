@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeEnableUsers</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Enables the users listed for the environment after a copy disabled them. Every other user keeps its state.
+/// </summary>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'EnableUsers')]
+public final class BDRTaskTypeEnableUsers implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'EnableUsers';
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeEnableUsers::Name, literalStr("@BDR:TaskEnableUsers"), 10, false, menuItemDisplayStr(BDRUserToEnable));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        UserInfo userInfo;
+        BDRUserToEnable userToEnable;
+        BDRRecordsAffected enabled;
+
+        ttsbegin;
+
+        // Only the users listed for the environment; every other user keeps its state.
+        while select forupdate userInfo
+            where userInfo.enable == NoYes::No
+            exists join userToEnable
+                where userToEnable.UserId == userInfo.id
+                    && userToEnable.EnvironmentId == environmentId
+        {
+            userInfo.enable = NoYes::Yes;
+            userInfo.update();
+            enabled++;
+        }
+
+        ttscommit;
+
+        _context.addRecordsAffected(enabled);
+        _context.logInfo(strFmt("@BDR:MsgRecordsUpdated", enabled));
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

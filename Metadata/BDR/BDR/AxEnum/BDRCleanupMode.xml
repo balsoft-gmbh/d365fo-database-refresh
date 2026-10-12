@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEnum xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRCleanupMode</Name>
+	<Label>@BDR:CleanupMode</Label>
+	<UseEnumValue>Yes</UseEnumValue>
+	<EnumValues>
+		<AxEnumValue>
+			<Name>DeleteOlderThan</Name>
+			<Label>@BDR:ModeDeleteOlderThan</Label>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>DeleteAll</Name>
+			<Label>@BDR:ModeDeleteAll</Label>
+			<Value>2</Value>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>Truncate</Name>
+			<Label>@BDR:ModeTruncate</Label>
+			<Value>1</Value>
+		</AxEnumValue>
+	</EnumValues>
+</AxEnum>

@@ -1,0 +1,411 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRSetupCompany</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A company a setup row applies to (field value, business event, cleanup rule) when the row
+/// is not for all companies. The row is referenced by table ID and record ID.
+/// </summary>
+public class BDRSetupCompany extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>companyName</Name>
+				<Source><![CDATA[
+
+    public display Name companyName()
+    {
+        return CompanyInfo::findDataArea(this.Company).Name;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        if (!this.RefRecId || !CompanyInfo::findDataArea(this.Company).RecId)
+        {
+            ret = checkFailed("@BDR:ErrInvalidRuleCompany") && ret;
+        }
+
+        if (ret && this.RefTableId == tableNum(BDRCleanupRule))
+        {
+            BDRCleanupRule rule;
+
+            select firstonly rule
+                where rule.RecId == this.RefRecId;
+
+            ret = rule.allowsCompany(this.Company);
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies a setup row applies to: every company, or the companies selected for the row.
+    /// </summary>
+    /// <param name = "_row">The setup row; it has an AllCompanies field.</param>
+    /// <returns>A set of company IDs.</returns>
+    public static Set companies(Common _row)
+    {
+        Set companies = new Set(Types::String);
+        DataArea dataArea;
+        BDRSetupCompany selected;
+
+        if (_row.(fieldName2Id(_row.TableId, 'AllCompanies')))
+        {
+            while select id from dataArea
+                where dataArea.isVirtual == NoYes::No
+            {
+                companies.add(dataArea.id);
+            }
+        }
+        else
+        {
+            while select Company from selected
+                order by Company
+                where selected.RefTableId == _row.TableId
+                    && selected.RefRecId == _row.RecId
+            {
+                companies.add(selected.Company);
+            }
+        }
+
+        return companies;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>scope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies of a row as text; empty when the row is for all companies.
+    /// </summary>
+    /// <param name = "_row">The setup row.</param>
+    /// <returns>For example 'DEMF, USMF', or 'BRMF, CNMF, DEMF +21' for a long list.</returns>
+    public static str scope(Common _row)
+    {
+        const int MaxShown = 3;
+        str text;
+        int shown;
+
+        if (_row.(fieldName2Id(_row.TableId, 'AllCompanies')) || !_row.RecId)
+        {
+            return '';
+        }
+
+        Set companies = BDRSetupCompany::companies(_row);
+        SetEnumerator enumerator = companies.getEnumerator();
+
+        while (enumerator.moveNext() && shown < MaxShown)
+        {
+            text += (text ? ', ' : '') + strUpr(enumerator.current());
+            shown++;
+        }
+
+        if (companies.elements() > MaxShown)
+        {
+            text += strFmt(' +%1', companies.elements() - MaxShown);
+        }
+
+        return text;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteFor</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes the selected companies of a row.
+    /// </summary>
+    /// <param name = "_row">The setup row.</param>
+    public static void deleteFor(Common _row)
+    {
+        BDRSetupCompany selected;
+
+        delete_from selected
+            where selected.RefTableId == _row.TableId
+                && selected.RefRecId == _row.RecId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>copy</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Copies the selected companies of one row to another row of the same table.
+    /// </summary>
+    /// <param name = "_from">The source row.</param>
+    /// <param name = "_to">The target row.</param>
+    /// <returns>The number of companies refused by the validation of the target row.</returns>
+    public static int copy(Common _from, Common _to)
+    {
+        BDRSetupCompany source;
+        int refused;
+
+        while select Company from source
+            where source.RefTableId == _from.TableId
+                && source.RefRecId == _from.RecId
+        {
+            BDRSetupCompany target;
+
+            target.RefTableId = _to.TableId;
+            target.RefRecId = _to.RecId;
+            target.Company = source.Company;
+
+            // For example a company that another cleanup rule of the table covers in the target.
+            if (!target.validateWrite())
+            {
+                refused++;
+                continue;
+            }
+
+            target.insert();
+        }
+
+        return refused;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>addAllCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Adds every company that is not yet selected for a row.
+    /// </summary>
+    /// <param name = "_row">The setup row.</param>
+    public static void addAllCompanies(Common _row)
+    {
+        DataArea dataArea;
+        BDRSetupCompany existing;
+
+        ttsbegin;
+
+        while select id from dataArea
+            where dataArea.isVirtual == NoYes::No
+            notexists join existing
+                where existing.RefTableId == _row.TableId
+                    && existing.RefRecId == _row.RecId
+                    && existing.Company == dataArea.id
+        {
+            BDRSetupCompany company;
+
+            company.RefTableId = _row.TableId;
+            company.RefRecId = _row.RecId;
+            company.Company = dataArea.id;
+
+            if (_row.TableId != tableNum(BDRCleanupRule) || BDRSetupCompany::isFreeForCleanupRule(_row, dataArea.id))
+            {
+                company.insert();
+            }
+        }
+
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>rowTitle</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// A short description of a setup row for the caption of the companies page.
+    /// </summary>
+    /// <param name = "_row">The setup row.</param>
+    /// <returns>The description.</returns>
+    public static str rowTitle(Common _row)
+    {
+        switch (_row.TableId)
+        {
+            case tableNum(BDRFieldValue):
+                BDRFieldValue fieldValue = _row;
+                return strFmt('%1, %2.%3', fieldValue.EnvironmentId, fieldValue.TableName, fieldValue.FieldName);
+
+            case tableNum(BDREndpoint):
+                BDREndpoint endpoint = _row;
+                return strFmt('%1, %2', endpoint.EnvironmentId, endpoint.EndpointName);
+
+            case tableNum(BDRCleanupRule):
+                BDRCleanupRule rule = _row;
+                return strFmt('%1, %2', rule.EnvironmentId, rule.TableName);
+
+            case tableNum(BDRWorkflowCancel):
+                BDRWorkflowCancel workflowCancel = _row;
+                return strFmt('%1, %2', workflowCancel.EnvironmentId, workflowCancel.ConfigurationName ? workflowCancel.ConfigurationName : "@BDR:AllWorkflows");
+        }
+
+        return '';
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isFreeForCleanupRule</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks without a message whether no other rule of the same table covers a company.
+    /// </summary>
+    private static boolean isFreeForCleanupRule(Common _row, DataAreaId _company)
+    {
+        BDRCleanupRule rule = _row;
+        BDRCleanupRule other;
+
+        while select other
+            where other.EnvironmentId == rule.EnvironmentId
+                && other.TableName == rule.TableName
+                && other.RecId != rule.RecId
+        {
+            if (other.AllCompanies || other.CleanupMode == BDRCleanupMode::Truncate || other.companies().in(_company))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:SetupCompanies</DeveloperDocumentation>
+	<Label>@BDR:SetupCompanies</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>Company</TitleField1>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>RefCompanyIdx</ReplacementKey>
+	<ClusteredIndex>RefCompanyIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>RefCompanyIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>RefTableId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>RefRecId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Company</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>Company</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt">
+			<Name>RefTableId</Name>
+			<ExtendedDataType>RefTableId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+			<Visible>No</Visible>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt64">
+			<Name>RefRecId</Name>
+			<ExtendedDataType>RefRecId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+			<Visible>No</Visible>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>Company</Name>
+			<ExtendedDataType>DataAreaId</ExtendedDataType>
+			<Label>@BDR:Company</Label>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>RefCompanyIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>RefTableId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>RefRecId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>Company</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Company</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>DataArea</RelatedTable>
+			<RelatedTableCardinality>ZeroOne</RelatedTableCardinality>
+			<RelationshipType>Association</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>Company</Name>
+					<Field>Company</Field>
+					<RelatedField>id</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

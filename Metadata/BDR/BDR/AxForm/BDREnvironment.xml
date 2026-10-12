@@ -1,0 +1,502 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxForm xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V6">
+	<Name>BDREnvironment</Name>
+	<SourceCode>
+		<Methods xmlns="">
+			<Method>
+				<Name>classDeclaration</Name>
+				<Source><![CDATA[
+[Form]
+public class BDREnvironment extends FormRun
+{
+}
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>init</Name>
+				<Source><![CDATA[
+    public void init()
+    {
+        BDRTaskTypeRegistration::registerTypes();
+        BDREnvironmentTask::deleteOrphans();
+
+        super();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateTaskButtons</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Set up needs a task type with a setup form.
+    /// </summary>
+    public void updateTaskButtons()
+    {
+        TaskSetup.enabled(BDRTaskType::find(BDREnvironmentTask.TaskTypeName).SetupMenuItem != '');
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+		<DataSources xmlns="">
+			<DataSource>
+				<Name>BDREnvironment</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            this.cacheAddMethod(tableMethodStr(BDREnvironment, isCurrent));
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>written</Name>
+						<Source><![CDATA[
+        public void written()
+        {
+            super();
+
+            BDREnvironmentTask_ds.executeQuery();
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            // Reload the tasks of the selected environment; executeQuery sets the environment range.
+            BDREnvironmentTask_ds.executeQuery();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>create</Name>
+						<Source><![CDATA[
+        public void create(boolean _append = false)
+        {
+            super(_append);
+
+            // A new record has no children yet; do not keep showing those of the previous record.
+            BDREnvironmentTask_ds.executeQuery();
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+			<DataSource>
+				<Name>BDREnvironmentTask</Name>
+				<Methods>
+					<Method>
+						<Name>init</Name>
+						<Source><![CDATA[
+        public void init()
+        {
+            super();
+
+            this.queryBuildDataSource().addSortField(fieldNum(BDREnvironmentTask, Sequence));
+            this.cacheAddMethod(tableMethodStr(BDREnvironmentTask, taskLabel));
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>active</Name>
+						<Source><![CDATA[
+        public int active()
+        {
+            int ret = super();
+
+            element.updateTaskButtons();
+
+            return ret;
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>executeQuery</Name>
+						<Source><![CDATA[
+        public void executeQuery()
+        {
+            SysQuery::findOrCreateRange(this.queryBuildDataSource(), fieldNum(BDREnvironmentTask, EnvironmentId)).value(
+                BDREnvironment.EnvironmentId ? queryValue(BDREnvironment.EnvironmentId) : SysQuery::valueEmptyString());
+
+            super();
+        }
+
+]]></Source>
+					</Method>
+					<Method>
+						<Name>initValue</Name>
+						<Source><![CDATA[
+        public void initValue()
+        {
+            super();
+
+            BDREnvironmentTask.EnvironmentId = BDREnvironment.EnvironmentId;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+				<Fields />
+			</DataSource>
+		</DataSources>
+		<DataControls xmlns="">
+			<Control>
+				<Name>AddCurrentEnvironment</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            SysEnvironmentid currentId = BDREnvironmentResolver::currentEnvironmentId();
+            BDREnvironment existing = BDREnvironment::findBySysEnvironmentId(currentId);
+
+            super();
+
+            if (existing.RecId)
+            {
+                BDREnvironment_ds.positionToRecord(existing);
+                info(strFmt("@BDR:CurrentEnvironmentExists", existing.EnvironmentId));
+                return;
+            }
+
+            BDREnvironment_ds.create();
+            BDREnvironment.SysEnvironmentId = currentId;
+            BDREnvironment.EnvironmentMode = EnvironmentMode::TST;
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>TaskSetup</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            BDRTaskType taskType = BDRTaskType::find(BDREnvironmentTask.TaskTypeName);
+
+            super();
+
+            if (!taskType.SetupMenuItem)
+            {
+                info("@BDR:NoTaskSetup");
+                return;
+            }
+
+            Args args = new Args();
+            args.record(BDREnvironment);
+            args.caller(element);
+
+            new MenuFunction(taskType.SetupMenuItem, MenuItemType::Display).run(args);
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+			<Control>
+				<Name>AddTaskTypes</Name>
+				<Type>Button</Type>
+				<Methods>
+					<Method>
+						<Name>clicked</Name>
+						<Source><![CDATA[
+        public void clicked()
+        {
+            super();
+
+            if (BDREnvironment.RecId)
+            {
+                BDREnvironment.addAllTaskTypes();
+                BDREnvironmentTask_ds.executeQuery();
+            }
+        }
+
+]]></Source>
+					</Method>
+				</Methods>
+			</Control>
+		</DataControls>
+		<Members xmlns="" />
+	</SourceCode>
+	<DataSources>
+		<AxFormDataSource xmlns="">
+			<Name>BDREnvironment</Name>
+			<Table>BDREnvironment</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+		<AxFormDataSource xmlns="">
+			<Name>BDREnvironmentTask</Name>
+			<Table>BDREnvironmentTask</Table>
+			<InsertIfEmpty>No</InsertIfEmpty>
+			<Fields />
+			<ReferencedDataSources />
+			<JoinSource>BDREnvironment</JoinSource>
+			<LinkType>Delayed</LinkType>
+			<DataSourceLinks />
+			<DerivedDataSources />
+		</AxFormDataSource>
+	</DataSources>
+	<Design>
+		<Caption xmlns="">@BDR:Environments</Caption>
+		<DataSource xmlns="">BDREnvironment</DataSource>
+		<Pattern xmlns="">Custom</Pattern>
+		<TitleDataSource xmlns="">BDREnvironment</TitleDataSource>
+		<Controls xmlns="">
+			<AxFormControl xmlns=""
+				i:type="AxFormActionPaneControl">
+				<Name>ActionPane</Name>
+				<Type>ActionPane</Type>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormButtonGroupControl">
+						<Name>EnvironmentGroup</Name>
+						<Type>ButtonGroup</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonControl">
+								<Name>AddCurrentEnvironment</Name>
+								<Type>Button</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<NormalImage>Add</NormalImage>
+								<Text>@BDR:AddCurrentEnvironment</Text>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>CopySetup</Name>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<MenuItemName>BDRSetupCopyController</MenuItemName>
+								<MenuItemType>Action</MenuItemType>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>RunJob</Name>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<MenuItemName>BDRJobController</MenuItemName>
+								<MenuItemType>Action</MenuItemType>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormMenuFunctionButtonControl">
+								<Name>TaskTypes</Name>
+								<Type>MenuFunctionButton</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<MenuItemName>BDRTaskType</MenuItemName>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDREnvironment</DataSource>
+					</AxFormControl>
+				</Controls>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGridControl">
+				<Name>EnvironmentGrid</Name>
+				<HeightMode>SizeToAvailable</HeightMode>
+				<Type>Grid</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>EnvironmentGrid_EnvironmentId</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>EnvironmentId</DataField>
+						<DataSource>BDREnvironment</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormComboBoxControl">
+						<Name>EnvironmentGrid_EnvironmentMode</Name>
+						<Type>ComboBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>EnvironmentMode</DataField>
+						<DataSource>BDREnvironment</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormStringControl">
+						<Name>EnvironmentGrid_SysEnvironmentId</Name>
+						<Type>String</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataField>SysEnvironmentId</DataField>
+						<DataSource>BDREnvironment</DataSource>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormCheckBoxControl">
+						<Name>EnvironmentGrid_isCurrent</Name>
+						<Type>CheckBox</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<DataMethod>isCurrent</DataMethod>
+						<DataSource>BDREnvironment</DataSource>
+						<Label>@BDR:CurrentEnvironment</Label>
+					</AxFormControl>
+				</Controls>
+				<DataSource>BDREnvironment</DataSource>
+				<Style>Tabular</Style>
+			</AxFormControl>
+			<AxFormControl xmlns=""
+				i:type="AxFormGroupControl">
+				<Name>TasksGroup</Name>
+				<HeightMode>SizeToAvailable</HeightMode>
+				<Type>Group</Type>
+				<WidthMode>SizeToAvailable</WidthMode>
+				<FormControlExtension
+					i:nil="true" />
+				<Controls>
+					<AxFormControl xmlns=""
+						i:type="AxFormActionPaneControl">
+						<Name>TasksStrip</Name>
+						<Type>ActionPane</Type>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormButtonGroupControl">
+								<Name>TasksStripGroup</Name>
+								<Type>ButtonGroup</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<Controls>
+									<AxFormControl xmlns=""
+										i:type="AxFormButtonControl">
+										<Name>TaskSetup</Name>
+										<AutoDeclaration>Yes</AutoDeclaration>
+										<Type>Button</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<NormalImage>Settings</NormalImage>
+										<Text>@BDR:TaskSetup</Text>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormCommandButtonControl">
+										<Name>AddTask</Name>
+										<Type>CommandButton</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<Command>New</Command>
+										<NormalImage>New</NormalImage>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormCommandButtonControl">
+										<Name>RemoveTask</Name>
+										<Type>CommandButton</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<Command>DeleteRecord</Command>
+										<NeedsRecord>Yes</NeedsRecord>
+										<NormalImage>Delete</NormalImage>
+									</AxFormControl>
+									<AxFormControl xmlns=""
+										i:type="AxFormButtonControl">
+										<Name>AddTaskTypes</Name>
+										<Type>Button</Type>
+										<FormControlExtension
+											i:nil="true" />
+										<NormalImage>Add</NormalImage>
+										<Text>@BDR:AddTaskTypes</Text>
+									</AxFormControl>
+								</Controls>
+								<DataSource>BDREnvironmentTask</DataSource>
+							</AxFormControl>
+						</Controls>
+						<Style>Strip</Style>
+					</AxFormControl>
+					<AxFormControl xmlns=""
+						i:type="AxFormGridControl">
+						<Name>TasksGrid</Name>
+						<HeightMode>SizeToAvailable</HeightMode>
+						<Type>Grid</Type>
+						<WidthMode>SizeToAvailable</WidthMode>
+						<FormControlExtension
+							i:nil="true" />
+						<Controls>
+							<AxFormControl xmlns=""
+								i:type="AxFormCheckBoxControl">
+								<Name>TasksGrid_IsActive</Name>
+								<Type>CheckBox</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>IsActive</DataField>
+								<DataSource>BDREnvironmentTask</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormIntegerControl">
+								<Name>TasksGrid_Sequence</Name>
+								<Type>Integer</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>Sequence</DataField>
+								<DataSource>BDREnvironmentTask</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>TasksGrid_TaskTypeName</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataField>TaskTypeName</DataField>
+								<DataSource>BDREnvironmentTask</DataSource>
+							</AxFormControl>
+							<AxFormControl xmlns=""
+								i:type="AxFormStringControl">
+								<Name>TasksGrid_taskLabel</Name>
+								<Type>String</Type>
+								<FormControlExtension
+									i:nil="true" />
+								<DataMethod>taskLabel</DataMethod>
+								<DataSource>BDREnvironmentTask</DataSource>
+								<Label>@BDR:TaskDescription</Label>
+							</AxFormControl>
+						</Controls>
+						<DataSource>BDREnvironmentTask</DataSource>
+						<Style>Tabular</Style>
+					</AxFormControl>
+				</Controls>
+				<Caption>@BDR:EnvironmentTasks</Caption>
+			</AxFormControl>
+		</Controls>
+	</Design>
+	<Parts />
+</AxForm>

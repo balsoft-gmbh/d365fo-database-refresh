@@ -1,0 +1,441 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRFieldValue</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// A value written into a table field when the environment is refreshed.
+/// </summary>
+public class BDRFieldValue extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>validateField</Name>
+				<Source><![CDATA[
+
+    public boolean validateField(FieldId _fieldId)
+    {
+        boolean ret = super(_fieldId);
+        TableId tableId = tableName2Id(this.TableName);
+
+        switch (_fieldId)
+        {
+            case fieldNum(BDRFieldValue, TableName):
+                if (this.TableName && !tableId)
+                {
+                    ret = checkFailed(strFmt("@BDR:ErrInvalidTable", this.TableName));
+                }
+                else if (tableId)
+                {
+                    // The lookup leaves these out; a typed name must not get through either.
+                    DictTable dictTable = new DictTable(tableId);
+
+                    // TableType covers in-memory and TempDB tables; isTmp() alone misses TempDB.
+                    if (dictTable.tableType() != TableType::Regular || dictTable.isView() || dictTable.isMap() || dictTable.isSystemTable())
+                    {
+                        ret = checkFailed(strFmt("@BDR:ErrTableNotWritable", this.TableName));
+                    }
+                }
+                break;
+
+            case fieldNum(BDRFieldValue, FieldName):
+                if (this.FieldName && tableId && !fieldName2Id(tableId, this.FieldName))
+                {
+                    ret = checkFailed(strFmt("@BDR:ErrInvalidField", this.FieldName, this.TableName));
+                }
+                else if (this.FieldName && tableId && new DictField(tableId, fieldName2Id(tableId, this.FieldName)).isSystem())
+                {
+                    // RecId, DataAreaId, RecVersion and the like: the lookup hides them, a typed name must not get through.
+                    ret = checkFailed(strFmt("@BDR:ErrSystemField", this.FieldName, this.TableName));
+                }
+                break;
+
+            case fieldNum(BDRFieldValue, KeyFieldName):
+                if (this.KeyFieldName && tableId && !fieldName2Id(tableId, this.KeyFieldName))
+                {
+                    ret = checkFailed(strFmt("@BDR:ErrInvalidField", this.KeyFieldName, this.TableName));
+                }
+                break;
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        ret = this.validateField(fieldNum(BDRFieldValue, TableName)) && ret;
+        ret = this.validateField(fieldNum(BDRFieldValue, FieldName)) && ret;
+        ret = this.validateField(fieldNum(BDRFieldValue, KeyFieldName)) && ret;
+
+        if (this.SecretName && this.FieldValue)
+        {
+            ret = checkFailed("@BDR:ErrValueAndSecret") && ret;
+        }
+
+        // The value (unless it comes from a secret at run time) and the key value must fit their fields.
+        TableId tableId = tableName2Id(this.TableName);
+        FieldId fieldId = tableId ? fieldName2Id(tableId, this.FieldName) : 0;
+        FieldId keyFieldId = tableId && this.KeyFieldName ? fieldName2Id(tableId, this.KeyFieldName) : 0;
+
+        if (fieldId && !this.SecretName && !BDRTaskTypeFieldValues::canConvert(tableId, fieldId, this.FieldValue))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrValueNotConvertible", this.FieldValue, this.TableName, this.FieldName)) && ret;
+        }
+
+        if (keyFieldId && !BDRTaskTypeFieldValues::canConvert(tableId, keyFieldId, this.KeyValue))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrValueNotConvertible", this.KeyValue, this.TableName, this.KeyFieldName)) && ret;
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.AllCompanies = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>insert</Name>
+				<Source><![CDATA[
+
+    public void insert()
+    {
+        // The same rule as update(): a shared table is always for all companies (also for copied rows).
+        if (!this.canChooseCompanies())
+        {
+            this.AllCompanies = NoYes::Yes;
+        }
+
+        super();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>update</Name>
+				<Source><![CDATA[
+
+    public void update()
+    {
+        if (!this.canChooseCompanies())
+        {
+            this.AllCompanies = NoYes::Yes;
+        }
+
+        super();
+
+        // All companies replaces the list of selected companies.
+        if (this.AllCompanies)
+        {
+            BDRSetupCompany::deleteFor(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>delete</Name>
+				<Source><![CDATA[
+
+    public void delete()
+    {
+        super();
+
+        BDRSetupCompany::deleteFor(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies this row applies to.
+    /// </summary>
+    /// <returns>A set of company IDs.</returns>
+    public Set companies()
+    {
+        return BDRSetupCompany::companies(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyScope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies; empty when the row is for all companies.
+    /// </summary>
+    public display Description companyScope()
+    {
+        return BDRSetupCompany::scope(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isSharedTable</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the table of the row is shared by all companies.
+    /// </summary>
+    /// <returns>True for a table that is not saved per company.</returns>
+    public boolean isSharedTable()
+    {
+        TableId tableId = tableName2Id(this.TableName);
+
+        return tableId && !new DictTable(tableId).dataPrCompany();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canChooseCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Companies can only be chosen for a table that is saved per company.
+    /// </summary>
+    /// <returns>True if the row can be limited to selected companies.</returns>
+    public boolean canChooseCompanies()
+    {
+        return this.TableName && !this.isSharedTable();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>modifiedField</Name>
+				<Source><![CDATA[
+
+    public void modifiedField(FieldId _fieldId)
+    {
+        super(_fieldId);
+
+        switch (_fieldId)
+        {
+            case fieldNum(BDRFieldValue, TableName):
+                if (!this.canChooseCompanies())
+                {
+                    this.AllCompanies = NoYes::Yes;
+                }
+                break;
+
+            case fieldNum(BDRFieldValue, KeyFieldName):
+                if (!this.KeyFieldName)
+                {
+                    this.KeyValue = '';
+                }
+                break;
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:FieldValues</DeveloperDocumentation>
+	<Label>@BDR:FieldValues</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>TableName</TitleField1>
+	<TitleField2>FieldName</TitleField2>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>FieldValueIdx</ReplacementKey>
+	<ClusteredIndex>FieldValueIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>FieldValueIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TableName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>FieldName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>FieldValue</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyFieldName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyValue</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>TableName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>FieldName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>FieldValue</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyFieldName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>KeyValue</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>SecretName</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>TableName</Name>
+			<ExtendedDataType>TableName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>FieldName</Name>
+			<ExtendedDataType>FieldName</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>FieldValue</Name>
+			<ExtendedDataType>BDRFieldValueText</ExtendedDataType>
+			<Label>@BDR:ValueToWrite</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>KeyFieldName</Name>
+			<ExtendedDataType>FieldName</ExtendedDataType>
+			<HelpText>@BDR:OnlyWhereFieldHelp</HelpText>
+			<Label>@BDR:OnlyWhereField</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>KeyValue</Name>
+			<ExtendedDataType>BDRKeyValue</ExtendedDataType>
+			<Label>@BDR:OnlyWhereValue</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>SecretName</Name>
+			<ExtendedDataType>BDRSecretName</ExtendedDataType>
+			<HelpText>@BDR:RuntimeValueHelp</HelpText>
+			<Label>@BDR:RuntimeValueName</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AllCompanies</Name>
+			<HelpText>@BDR:RowAllCompaniesHelp</HelpText>
+			<Label>@BDR:AllCompanies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>FieldValueIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>TableName</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>FieldName</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>KeyFieldName</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>KeyValue</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

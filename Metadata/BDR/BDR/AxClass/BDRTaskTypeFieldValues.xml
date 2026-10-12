@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeFieldValues</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Writes environment specific values into any table field: integration URLs, e-mail settings,
+/// storage accounts, print destinations. Values can come from a secret passed to the service call.
+/// </summary>
+/// <remarks>
+/// Values are written with doUpdate, like a data import that skips business logic: the task
+/// restores technical settings and must not start the processes an update would trigger.
+/// </remarks>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'FieldValues')]
+public final class BDRTaskTypeFieldValues implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'FieldValues';
+
+    private BDRTaskContext context;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeFieldValues::Name, literalStr("@BDR:TaskFieldValues"), 40, false, menuItemDisplayStr(BDRFieldValue));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BDRFieldValue fieldValue;
+
+        context = _context;
+
+        while select fieldValue
+            order by RecId
+            where fieldValue.EnvironmentId == environmentId
+        {
+            this.apply(fieldValue);
+        }
+
+        context.logInfo(strFmt("@BDR:MsgRecordsUpdated", context.recordsAffected()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>apply</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Applies one field value rule in the companies of the rule.
+    /// </summary>
+    private void apply(BDRFieldValue _fieldValue)
+    {
+        TableId tableId = tableName2Id(_fieldValue.TableName);
+        DictTable dictTable = tableId ? new DictTable(tableId) : null;
+
+        if (!dictTable)
+        {
+            context.logWarning(strFmt("@BDR:ErrInvalidTable", _fieldValue.TableName));
+            return;
+        }
+
+        FieldId fieldId = fieldName2Id(tableId, _fieldValue.FieldName);
+        FieldId keyFieldId = _fieldValue.KeyFieldName ? fieldName2Id(tableId, _fieldValue.KeyFieldName) : 0;
+
+        if (!fieldId || (_fieldValue.KeyFieldName && !keyFieldId))
+        {
+            context.logWarning(strFmt("@BDR:ErrInvalidField", fieldId ? _fieldValue.KeyFieldName : _fieldValue.FieldName, _fieldValue.TableName));
+            return;
+        }
+
+        str valueText = _fieldValue.SecretName ? context.secret(_fieldValue.SecretName) : _fieldValue.FieldValue;
+        // A secret value must never appear in an error message, which ends up in the job log and the service result.
+        str displayText = _fieldValue.SecretName ? strFmt('<%1>', _fieldValue.SecretName) : _fieldValue.FieldValue;
+        anytype value = BDRTaskTypeFieldValues::convert(tableId, fieldId, valueText, displayText);
+        anytype keyValue = keyFieldId ? BDRTaskTypeFieldValues::convert(tableId, keyFieldId, _fieldValue.KeyValue) : '';
+
+        if (!dictTable.dataPrCompany())
+        {
+            // Shared table: one pass, the companies of the row do not apply.
+            this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue);
+            return;
+        }
+
+        Set companies = _fieldValue.companies();
+
+        if (!companies.elements())
+        {
+            context.logWarning(strFmt("@BDR:MsgNoCompaniesSkipped", strFmt('%1.%2', _fieldValue.TableName, _fieldValue.FieldName)));
+            return;
+        }
+
+        SetEnumerator setEnumerator = companies.getEnumerator();
+
+        while (setEnumerator.moveNext())
+        {
+            DataAreaId company = setEnumerator.current();
+
+            changecompany(company)
+            {
+                this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateRecords</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Updates all records of the current company, or the records where the key field has the key value.
+    /// </summary>
+    private void updateRecords(DictTable _dictTable, FieldId _fieldId, anytype _value, FieldId _keyFieldId, anytype _keyValue, BDRFieldValue _fieldValue)
+    {
+        Common record = _dictTable.makeRecord();
+        BDRRecordsAffected updated;
+
+        ttsbegin;
+
+        record.selectForUpdate(true);
+
+        if (_keyFieldId)
+        {
+            while select record
+                where record.(_keyFieldId) == _keyValue
+            {
+                record.(_fieldId) = _value;
+                record.doUpdate();
+                updated++;
+            }
+
+            if (!updated)
+            {
+                context.logWarning(strFmt("@BDR:MsgRecordNotFound", _fieldValue.TableName, _fieldValue.KeyFieldName, _fieldValue.KeyValue));
+            }
+        }
+        else
+        {
+            while select record
+            {
+                record.(_fieldId) = _value;
+                record.doUpdate();
+                updated++;
+            }
+        }
+
+        ttscommit;
+
+        context.addRecordsAffected(updated);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>convert</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Converts the text of a rule into the type of the target field.
+    /// </summary>
+    /// <param name = "_tableId">The table.</param>
+    /// <param name = "_fieldId">The field.</param>
+    /// <param name = "_text">The text: dates as yyyy-mm-dd, date and time in ISO format, enums by name or number.</param>
+    /// <param name = "_displayText">The text shown in an error message instead of the value, for example the name of a secret. Empty for the value itself.</param>
+    /// <returns>The typed value.</returns>
+    public static anytype convert(TableId _tableId, FieldId _fieldId, str _text, str _displayText = '')
+    {
+        DictField dictField = new DictField(_tableId, _fieldId);
+        str displayText = _displayText ? _displayText : _text;
+
+        switch (dictField.baseType())
+        {
+            case Types::String:
+            case Types::RString:
+            case Types::VarString:
+                return _text;
+
+            case Types::Integer:
+                return str2Int(_text);
+
+            case Types::Int64:
+                return str2Int64(_text);
+
+            case Types::Real:
+                return str2Num(_text);
+
+            case Types::Date:
+                return str2Date(_text, 321);
+
+            case Types::UtcDateTime:
+                return DateTimeUtil::parse(_text);
+
+            case Types::Guid:
+                return str2Guid(_text);
+
+            case Types::Enum:
+                return BDRTaskTypeFieldValues::enumValue(dictField.enumId(), _text, displayText);
+        }
+
+        throw error(strFmt("@BDR:ErrValueConversion", displayText, dictField.name()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>enumValue</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Returns an enum value from its name or number.
+    /// </summary>
+    private static int enumValue(EnumId _enumId, str _text, str _displayText)
+    {
+        DictEnum dictEnum = new DictEnum(_enumId);
+        str trimmed = strLRTrim(_text);
+
+        if (trimmed && strKeep(trimmed, '0123456789') == trimmed)
+        {
+            return str2Int(trimmed);
+        }
+
+        for (int i = 0; i < dictEnum.values(); i++)
+        {
+            if (dictEnum.index2Symbol(i) == trimmed)
+            {
+                return dictEnum.index2Value(i);
+            }
+        }
+
+        throw error(strFmt("@BDR:ErrValueConversion", _displayText, dictEnum.name()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canConvert</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks without an error whether a text can be converted into the type of a field, so a setup
+    /// row is refused when it is saved instead of failing when the environment is refreshed.
+    /// </summary>
+    /// <param name = "_tableId">The table.</param>
+    /// <param name = "_fieldId">The field.</param>
+    /// <param name = "_text">The text.</param>
+    /// <returns>True if <c>convert</c> accepts the text.</returns>
+    public static boolean canConvert(TableId _tableId, FieldId _fieldId, str _text)
+    {
+        DictField dictField = new DictField(_tableId, _fieldId);
+
+        switch (dictField.baseType())
+        {
+            case Types::String:
+            case Types::RString:
+            case Types::VarString:
+            case Types::Integer:
+            case Types::Int64:
+            case Types::Real:
+            case Types::Date:
+            case Types::UtcDateTime:
+            case Types::Guid:
+                return true;
+
+            case Types::Enum:
+                DictEnum dictEnum = new DictEnum(dictField.enumId());
+                str trimmed = strLRTrim(_text);
+
+                boolean isNumber = trimmed && strKeep(trimmed, '0123456789') == trimmed;
+
+                // Same rules as enumValue: a name or a number of the enum.
+                for (int i = 0; i < dictEnum.values(); i++)
+                {
+                    if ((isNumber && dictEnum.index2Value(i) == str2Int(trimmed)) || (trimmed && dictEnum.index2Symbol(i) == trimmed))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+        }
+
+        return false;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

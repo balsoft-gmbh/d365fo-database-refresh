@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRJobService</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// SysOperation service that runs a database refresh job.
+/// </summary>
+public final class BDRJobService extends SysOperationServiceBase
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>process</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Runs the job, or continues the batch part of a job started from the service.
+    /// </summary>
+    /// <param name = "_contract">The job parameters.</param>
+    public void process(BDRJobContract _contract)
+    {
+        BDRJobHistory jobHistory;
+
+        if (_contract.parmContinueJobRecId())
+        {
+            jobHistory = BDRJobProcessor::continueInBatch(_contract.parmContinueJobRecId());
+        }
+        else
+        {
+            jobHistory = BDRJobProcessor::run(_contract.parmEnvironmentId(), this.isExecutingInBatch() ? BDRJobTrigger::Batch : BDRJobTrigger::Manual);
+        }
+
+        if (jobHistory.Status == BDRJobStatus::Failed || jobHistory.Status == BDRJobStatus::PartlySucceeded)
+        {
+            throw error(strFmt("@BDR:ErrJobFailed", jobHistory.RecId, jobHistory.Status));
+        }
+
+        info(strFmt("@BDR:JobFinished", jobHistory.RecId, jobHistory.Status));
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

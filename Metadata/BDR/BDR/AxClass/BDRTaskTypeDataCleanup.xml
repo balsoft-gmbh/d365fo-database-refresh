@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeDataCleanup</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Removes data the environment does not need: deletes records older than a number of days
+/// per company, or empties a table.
+/// </summary>
+/// <remarks>
+/// Complements the transactionless copy of the Power Platform admin center: it keeps recent data,
+/// works per company and table, and also works after an LCS database refresh. Only transaction,
+/// worksheet, staging and miscellaneous tables can be cleaned; master data, parameters, groups
+/// and system tables are refused. Deletes are set based and skip delete actions and data methods.
+/// </remarks>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'DataCleanup')]
+public final class BDRTaskTypeDataCleanup implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'DataCleanup';
+
+    private BDRTaskContext context;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeDataCleanup::Name, literalStr("@BDR:TaskDataCleanup"), 100, true, menuItemDisplayStr(BDRCleanupRule));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+
+    public void run(BDRTaskContext _context)
+    {
+        BDREnvironmentId environmentId = _context.environmentId();
+        BDRCleanupRule rule;
+
+        context = _context;
+
+        while select rule
+            where rule.EnvironmentId == environmentId
+                && rule.IsActive == NoYes::Yes
+        {
+            TableId tableId = tableName2Id(rule.TableName);
+            DictTable dictTable = tableId ? new DictTable(tableId) : null;
+
+            if (!dictTable)
+            {
+                context.logWarning(strFmt("@BDR:ErrInvalidTable", rule.TableName));
+                continue;
+            }
+
+            if (!BDRTaskTypeDataCleanup::isTableAllowed(dictTable))
+            {
+                context.logWarning(strFmt("@BDR:ErrTableNotAllowed", rule.TableName, dictTable.tableGroup()));
+                continue;
+            }
+
+            switch (rule.CleanupMode)
+            {
+                case BDRCleanupMode::Truncate:
+                    this.truncate(dictTable);
+                    break;
+
+                case BDRCleanupMode::DeleteAll:
+                    this.deleteAll(dictTable, rule);
+                    break;
+
+                default:
+                    this.deleteOlderThan(dictTable, rule);
+                    break;
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isTableAllowed</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether a table may be cleaned up.
+    /// </summary>
+    /// <param name = "_dictTable">The table.</param>
+    /// <returns>True for regular transaction, worksheet, staging and miscellaneous tables.</returns>
+    public static boolean isTableAllowed(DictTable _dictTable)
+    {
+        if (!_dictTable || _dictTable.isSystemTable() || _dictTable.isView() || _dictTable.tableType() != TableType::Regular)
+        {
+            return false;
+        }
+
+        // The history of this model is written while the job runs.
+        if (strStartsWith(_dictTable.name(), 'BDR'))
+        {
+            return false;
+        }
+
+        switch (_dictTable.tableGroup())
+        {
+            case TableGroup::Transaction:
+            case TableGroup::TransactionHeader:
+            case TableGroup::TransactionLine:
+            case TableGroup::Worksheet:
+            case TableGroup::WorksheetHeader:
+            case TableGroup::WorksheetLine:
+            case TableGroup::Staging:
+            case TableGroup::Miscellaneous:
+                return true;
+        }
+
+        return false;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>hasCreatedDateTime</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the table has a CreatedDateTime column in the database.
+    /// </summary>
+    /// <param name = "_tableId">The table.</param>
+    /// <returns>True if the table has a CreatedDateTime field.</returns>
+    public static boolean hasCreatedDateTime(TableId _tableId)
+    {
+        SqlDictionary sqlDictionary;
+
+        // The metadata property read through CLR returned Yes for tables without the field (InventJournalTable),
+        // so the database dictionary decides: the column exists only when the field is enabled.
+        select firstonly RecId from sqlDictionary
+            where sqlDictionary.TabId == _tableId
+               && sqlDictionary.FieldId != 0
+               && sqlDictionary.SqlName == 'CREATEDDATETIME';
+
+        return sqlDictionary.RecId != 0;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>truncate</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Empties a table in all companies.
+    /// </summary>
+    private void truncate(DictTable _dictTable)
+    {
+        new SqlDataDictionaryPermission(methodStr(SqlDataDictionary, tableTruncate)).assert();
+        new SqlDataDictionary().tableTruncate(_dictTable.id(), false);
+        CodeAccessPermission::revertAssert();
+
+        context.logInfo(strFmt("@BDR:MsgTableTruncated", _dictTable.name()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteOlderThan</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes the records created before the cut-off date, in the companies of the rule.
+    /// </summary>
+    private void deleteOlderThan(DictTable _dictTable, BDRCleanupRule _rule)
+    {
+        if (!BDRTaskTypeDataCleanup::hasCreatedDateTime(_dictTable.id()))
+        {
+            context.logWarning(strFmt("@BDR:ErrNoCreatedDateTime", _dictTable.name()));
+            return;
+        }
+
+        utcdatetime cutOff = DateTimeUtil::addDays(DateTimeUtil::utcNow(), -_rule.KeepDays);
+
+        if (!_dictTable.dataPrCompany())
+        {
+            this.deleteInCurrentCompany(_dictTable, _rule, cutOff);
+            return;
+        }
+
+        this.deleteInCompanies(_dictTable, _rule, cutOff);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteInCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes records in each company of the rule; all records if no cut-off is given.
+    /// </summary>
+    private void deleteInCompanies(DictTable _dictTable, BDRCleanupRule _rule, utcdatetime _cutOff)
+    {
+        Set companies = _rule.companies();
+
+        if (!companies.elements())
+        {
+            context.logWarning(strFmt("@BDR:MsgNoCompaniesSkipped", _rule.TableName));
+            return;
+        }
+
+        SetEnumerator enumerator = companies.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            changecompany(enumerator.current())
+            {
+                this.deleteInCurrentCompany(_dictTable, _rule, _cutOff);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteInCurrentCompany</Name>
+				<Source><![CDATA[
+
+    private void deleteInCurrentCompany(DictTable _dictTable, BDRCleanupRule _rule, utcdatetime _cutOff)
+    {
+        Common record = _dictTable.makeRecord();
+
+        record.skipDataMethods(true);
+        // Delete related records: the table's delete actions run, so for example journal lines go with their headers.
+        record.skipDeleteActions(!_rule.DeleteRelated);
+        record.skipDatabaseLog(true);
+        record.skipEvents(true);
+
+        SysDaQueryObject query = new SysDaQueryObject(record);
+
+        if (_cutOff != utcDateTimeNull())
+        {
+            query.whereClause(new SysDaLessThanExpression(
+                new SysDaFieldExpression(record, 'CreatedDateTime'),
+                new SysDaValueExpression(_cutOff)));
+        }
+
+        ttsbegin;
+
+        new SysDaDeleteStatement().delete(new SysDaDeleteObject(query));
+        int64 deleted = record.RowCount();
+
+        ttscommit;
+
+        context.addRecordsAffected(deleted);
+        context.logInfo(strFmt("@BDR:MsgRecordsDeleted", deleted, strFmt('%1 (%2)', _dictTable.name(), curExt())));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>deleteAll</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Deletes all records of the table in the companies of the rule; a shared table once.
+    /// </summary>
+    private void deleteAll(DictTable _dictTable, BDRCleanupRule _rule)
+    {
+        if (!_dictTable.dataPrCompany())
+        {
+            this.deleteInCurrentCompany(_dictTable, _rule, utcDateTimeNull());
+            return;
+        }
+
+        this.deleteInCompanies(_dictTable, _rule, utcDateTimeNull());
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

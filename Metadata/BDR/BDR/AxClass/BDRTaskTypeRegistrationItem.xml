@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeRegistrationItem</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Describes a registered task type, like <c>ArchiveServiceManagedTypeRegistration</c> does for archive types.
+/// </summary>
+public final class BDRTaskTypeRegistrationItem
+{
+    private BDRTaskTypeName name;
+    private LabelId labelId;
+    private BDRSequence defaultSequence;
+    private boolean runsInBatch;
+    private MenuItemNameDisplay setupMenuItem;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+
+    private void new()
+    {
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Creates a registration item.
+    /// </summary>
+    /// <param name = "_name">Unique task type name, the same as the ExportMetadata value.</param>
+    /// <param name = "_labelId">Label shown to users.</param>
+    /// <param name = "_defaultSequence">Sequence used when the task is added to an environment.</param>
+    /// <param name = "_runsInBatch">True for long running tasks that are scheduled in batch when the job runs from the service.</param>
+    /// <param name = "_setupMenuItem">Display menu item of the setup form of the task; it receives the environment as record.</param>
+    /// <returns>The registration item.</returns>
+    public static BDRTaskTypeRegistrationItem construct(BDRTaskTypeName _name, LabelId _labelId, BDRSequence _defaultSequence, boolean _runsInBatch = false, MenuItemNameDisplay _setupMenuItem = '')
+    {
+        BDRTaskTypeRegistrationItem item = new BDRTaskTypeRegistrationItem();
+
+        item.name = _name;
+        item.labelId = _labelId;
+        item.defaultSequence = _defaultSequence;
+        item.runsInBatch = _runsInBatch;
+        item.setupMenuItem = _setupMenuItem;
+
+        return item;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmName</Name>
+				<Source><![CDATA[
+
+    public BDRTaskTypeName parmName()
+    {
+        return name;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmLabelId</Name>
+				<Source><![CDATA[
+
+    public LabelId parmLabelId()
+    {
+        return labelId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmDefaultSequence</Name>
+				<Source><![CDATA[
+
+    public BDRSequence parmDefaultSequence()
+    {
+        return defaultSequence;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRunsInBatch</Name>
+				<Source><![CDATA[
+
+    public boolean parmRunsInBatch()
+    {
+        return runsInBatch;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmSetupMenuItem</Name>
+				<Source><![CDATA[
+
+    public MenuItemNameDisplay parmSetupMenuItem()
+    {
+        return setupMenuItem;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

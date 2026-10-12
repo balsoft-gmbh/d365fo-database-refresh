@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRServiceTaskResult</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Result of one task in a database refresh job.
+/// </summary>
+[DataContractAttribute]
+public final class BDRServiceTaskResult
+{
+    private BDRTaskTypeName taskTypeName;
+    private str status;
+    private BDRRecordsAffected recordsAffected;
+    private str message;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>newFromTaskHistory</Name>
+				<Source><![CDATA[
+
+    public static BDRServiceTaskResult newFromTaskHistory(BDRTaskHistory _taskHistory)
+    {
+        BDRServiceTaskResult result = new BDRServiceTaskResult();
+
+        result.taskTypeName = _taskHistory.TaskTypeName;
+        result.status = enum2Symbol(enumNum(BDRTaskStatus), _taskHistory.Status);
+        result.recordsAffected = _taskHistory.RecordsAffected;
+        result.message = _taskHistory.Message;
+
+        return result;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmTaskTypeName</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('TaskTypeName')]
+    public BDRTaskTypeName parmTaskTypeName(BDRTaskTypeName _taskTypeName = taskTypeName)
+    {
+        taskTypeName = _taskTypeName;
+        return taskTypeName;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmStatus</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('Status')]
+    public str parmStatus(str _status = status)
+    {
+        status = _status;
+        return status;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRecordsAffected</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('RecordsAffected')]
+    public BDRRecordsAffected parmRecordsAffected(BDRRecordsAffected _recordsAffected = recordsAffected)
+    {
+        recordsAffected = _recordsAffected;
+        return recordsAffected;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmMessage</Name>
+				<Source><![CDATA[
+
+    [DataMemberAttribute('Message')]
+    public str parmMessage(str _message = message)
+    {
+        message = _message;
+        return message;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

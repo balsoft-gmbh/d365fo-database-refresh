@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxMenuItemAction xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns="Microsoft.Dynamics.AX.Metadata.V1">
+	<Name>BDRSetupCopyController</Name>
+	<HelpText>@BDR:CopySetupHelp</HelpText>
+	<Label>@BDR:CopySetup</Label>
+	<Object>BDRSetupCopyController</Object>
+	<ObjectType>Class</ObjectType>
+</AxMenuItemAction>

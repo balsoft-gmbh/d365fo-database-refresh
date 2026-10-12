@@ -1,0 +1,134 @@
+# BDR (Balsoft Data Refresh): D365FO build pipeline
+# Microsoft-hosted (windows-latest) build, no permanent build VM. The DevALM
+# compiler/reference packages are pulled from blob storage at build time and
+# discarded with the agent. Produces BOTH the regular Deployable Package
+# (AXDeployableRuntime_*.zip) and the Power Platform Unified / cloud package
+# (CloudDeployablePackage_*), so the same build can target a PPAC environment.
+# Models are auto-detected from Metadata/*/Descriptor/*.xml.
+#
+# Deployment to a PPAC environment is a separate release pipeline.
+# Requires the "Dynamics 365 Finance and Operations Tools" extension from the
+# Visual Studio Marketplace and a variable group named BDR-Build-Secrets with
+# BLOB_ACCOUNT, BLOB_CONTAINER and BLOB_ACCOUNT_KEY (secret): a storage container
+# holding the four DevALM .nupkg files from LCS (Shared asset library > NuGet
+# package), stored without version in the file name (for example
+# Microsoft.Dynamics.AX.Platform.CompilerPackage.nupkg).
+
+name: 1.0.0$(Rev:.r)
+
+trigger: none
+
+pool:
+  vmImage: 'windows-latest'
+
+variables:
+  - group: BDR-Build-Secrets          # BLOB_ACCOUNT, BLOB_CONTAINER, BLOB_ACCOUNT_KEY (secret)
+  - name: ToolsPackage
+    value: Microsoft.Dynamics.AX.Platform.CompilerPackage
+  - name: PlatPackage
+    value: Microsoft.Dynamics.AX.Platform.DevALM.BuildXpp
+  - name: AppSuitePackage
+    value: Microsoft.Dynamics.AX.ApplicationSuite.DevALM.BuildXpp
+  - name: AppPackage
+    value: Microsoft.Dynamics.AX.Application.DevALM.BuildXpp
+  - name: MetadataPath
+    value: '$(Build.SourcesDirectory)\Metadata'
+  - name: SolutionPath
+    value: '$(Build.SourcesDirectory)\Projects\BalsoftDataRefresh\BalsoftDataRefresh.sln'
+  - name: NugetsPath
+    value: '$(Pipeline.Workspace)\NuGets'
+  - name: BlobPackagesPath
+    value: '$(Pipeline.Workspace)\BlobPackages'
+
+steps:
+  # 1. Pull the DevALM packages from blob (storage-key auth). Lives only on this VM.
+  - powershell: |
+      New-Item -ItemType Directory -Force -Path "$(BlobPackagesPath)" | Out-Null
+      az storage blob download-batch `
+        --account-name "$(BLOB_ACCOUNT)" `
+        --account-key  "$env:BLOB_ACCOUNT_KEY" `
+        --source       "$(BLOB_CONTAINER)" `
+        --destination  "$(BlobPackagesPath)" `
+        --pattern      "*.nupkg"
+      if ($LASTEXITCODE -ne 0) { throw "blob download failed" }
+      Get-ChildItem "$(BlobPackagesPath)" -Filter *.nupkg | ForEach-Object { Write-Host "downloaded: $($_.Name)" }
+    displayName: 'Download DevALM packages from blob'
+    env:
+      BLOB_ACCOUNT_KEY: $(BLOB_ACCOUNT_KEY)
+
+  # 2. Expand the DevALM .nupkg files into NugetsPath\<packageId>\. The packages are
+  #    stored versionless in blob, so a plain folder can't act as a NuGet source
+  #    (nuget install can't resolve by id). A .nupkg is just a zip, so extract it
+  #    directly, equivalent to `nuget install -ExcludeVersion`. The folder name
+  #    equals the package id, matching $(ToolsPackage)/$(PlatPackage)/etc.
+  - powershell: |
+      New-Item -ItemType Directory -Force -Path "$(NugetsPath)" | Out-Null
+      Add-Type -AssemblyName System.IO.Compression.FileSystem
+      $found = Get-ChildItem "$(BlobPackagesPath)" -Filter *.nupkg
+      if (-not $found) { throw "no .nupkg files found in $(BlobPackagesPath)" }
+      foreach ($pkg in $found) {
+        $id = [IO.Path]::GetFileNameWithoutExtension($pkg.Name)
+        $dest = Join-Path "$(NugetsPath)" $id
+        if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($pkg.FullName, $dest)
+        Write-Host "extracted $id"
+      }
+    displayName: 'Expand DevALM packages'
+
+  # 3. Detect models.
+  - powershell: |
+      # @(...) forces an array even when one model is found, so $models[0] is
+      # the model name ("BDR"), not the first character of a scalar string.
+      $models = @(Get-ChildItem -Path "$(MetadataPath)" -Recurse -Filter *.xml |
+        Where-Object { $_.DirectoryName -like "*\Descriptor" } |
+        ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) } |
+        Sort-Object -Unique)
+      if (-not $models) { throw "No models detected under $(MetadataPath)" }
+      Write-Host "Detected models: $($models -join ', ')"
+      Write-Host "##vso[task.setvariable variable=ModelList]$($models -join ';')"
+      Write-Host "##vso[task.setvariable variable=PrimaryModel]$($models[0])"
+    displayName: 'Detect models'
+
+  # 4. Stamp model version from the build number.
+  - task: XppUpdateModelVersion@0
+    displayName: 'Update Model Version'
+    inputs:
+      XppSourcePath: '$(Build.SourcesDirectory)'
+      XppDescriptorSearch: '**\Descriptor\*.xml'
+      XppLayer: '10'
+      VersionNumber: '$(Build.BuildNumber)'
+
+  # 5. Compile the X++ solution against the DevALM reference packages.
+  - task: MSBuild@1
+    displayName: 'Build solution'
+    inputs:
+      solution: '$(SolutionPath)'
+      msbuildArchitecture: 'x64'
+      msbuildArguments: >-
+        /p:BuildTasksDirectory="$(NugetsPath)\$(ToolsPackage)\DevAlm"
+        /p:MetadataDirectory="$(MetadataPath)"
+        /p:FrameworkDirectory="$(NugetsPath)\$(ToolsPackage)"
+        /p:ReferenceFolder="$(NugetsPath)\$(PlatPackage)\ref\net40;$(NugetsPath)\$(AppPackage)\ref\net40;$(NugetsPath)\$(AppSuitePackage)\ref\net40;$(MetadataPath);$(Build.BinariesDirectory)"
+        /p:ReferencePath="$(NugetsPath)\$(ToolsPackage)"
+        /p:OutputDirectory="$(Build.BinariesDirectory)"
+
+  # 6. Create BOTH packages: regular SDP zip + cloud/unified package for PPAC.
+  - task: XppCreatePackage@2
+    displayName: 'Create Deployable Package (regular + Power Platform unified)'
+    inputs:
+      XppToolsPath: '$(NugetsPath)\$(ToolsPackage)'
+      XppBinariesPath: '$(Build.BinariesDirectory)'
+      XppBinariesSearch: '$(ModelList)'
+      CreateRegularPackage: true
+      DeployablePackagePath: '$(Build.ArtifactStagingDirectory)\AXDeployableRuntime_$(Build.BuildNumber).zip'
+      CreateCloudPackage: true
+      CloudPackagePlatVersion: '7.0.0.0'
+      CloudPackageAppVersion: '10.0.0.0'
+      CloudPackageOutputLocation: '$(Build.ArtifactStagingDirectory)\CloudDeployablePackage_$(Build.BuildNumber)'
+
+  # BDR is MIT licensed: no ISV license file to embed.
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: drop'
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'

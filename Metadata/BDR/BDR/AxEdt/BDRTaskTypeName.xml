@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEdt xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns=""
+	i:type="AxEdtString">
+	<Name>BDRTaskTypeName</Name>
+	<Label>@BDR:TaskTypeName</Label>
+	<ArrayElements />
+	<Relations />
+	<TableReferences>
+		<AxEdtTableReference>
+			<Name>BDRTaskType</Name>
+			<Table>BDRTaskType</Table>
+			<Fields>
+				<AxEdtTableReferenceFilter xmlns=""
+					i:type="AxEdtTableReferenceField">
+					<Name>Name</Name>
+					<Field>Name</Field>
+				</AxEdtTableReferenceFilter>
+			</Fields>
+		</AxEdtTableReference>
+	</TableReferences>
+	<StringSize>60</StringSize>
+</AxEdt>

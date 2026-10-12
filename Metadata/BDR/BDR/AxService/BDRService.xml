@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxService xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRService</Name>
+	<Class>BDRService</Class>
+	<ExternalName>BDRService</ExternalName>
+	<ServiceOperations>
+		<AxServiceOperation>
+			<Name>run</Name>
+			<Method>run</Method>
+		</AxServiceOperation>
+		<AxServiceOperation>
+			<Name>getJobStatus</Name>
+			<Method>getJobStatus</Method>
+		</AxServiceOperation>
+	</ServiceOperations>
+</AxService>

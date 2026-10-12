@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEdt xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns=""
+	i:type="AxEdtString">
+	<Name>BDREnvironmentId</Name>
+	<HelpText>@BDR:EnvironmentIdHelp</HelpText>
+	<Label>@BDR:Environment</Label>
+	<ArrayElements />
+	<Relations />
+	<TableReferences>
+		<AxEdtTableReference>
+			<Name>BDREnvironment</Name>
+			<Table>BDREnvironment</Table>
+			<Fields>
+				<AxEdtTableReferenceFilter xmlns=""
+					i:type="AxEdtTableReferenceField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+				</AxEdtTableReferenceFilter>
+			</Fields>
+		</AxEdtTableReference>
+	</TableReferences>
+	<StringSize>20</StringSize>
+</AxEdt>

@@ -30,8 +30,7 @@ jobs:
   release:
     name: Build and release
     if: github.ref == 'refs/heads/main'
-    # The 10.0.48 X++ compiler package needs MSBuild of Visual Studio 2022, which only windows-2022 still has;
-    # on Visual Studio 2026 (windows-latest, windows-2025) Xppc.exe exits with -1.
+    # MSBuild of Visual Studio 2022, like the Azure DevOps build; on GitHub only windows-2022 still has it.
     runs-on: windows-2022
     environment: release
     timeout-minutes: 90
@@ -117,16 +116,24 @@ jobs:
           $metadata = Join-Path $env:GITHUB_WORKSPACE 'Metadata'
           $binaries = Join-Path $env:RUNNER_TEMP 'Binaries'
           New-Item -ItemType Directory -Force $binaries | Out-Null
-          # %3B keeps the list together as one MSBuild property value.
           $references = @(
             "$nugets\Microsoft.Dynamics.AX.Platform.DevALM.BuildXpp\ref\net40",
             "$nugets\Microsoft.Dynamics.AX.Application.DevALM.BuildXpp\ref\net40",
             "$nugets\Microsoft.Dynamics.AX.ApplicationSuite.DevALM.BuildXpp\ref\net40",
             $metadata,
-            $binaries) -join '%3B'
-          msbuild Projects\BalsoftDataRefresh\BalsoftDataRefresh.sln /nologo /verbosity:minimal `
-            "/p:BuildTasksDirectory=$tools\DevAlm" "/p:MetadataDirectory=$metadata" "/p:FrameworkDirectory=$tools" `
-            "/p:ReferenceFolder=$references" "/p:ReferencePath=$tools" "/p:OutputDirectory=$binaries"
+            $binaries) -join ';'
+          # A response file passes the reference list as one quoted value with plain semicolons, which the X++
+          # build targets split into folders (escaped as %3B it reaches the compiler as one invalid path).
+          $responseFile = Join-Path $env:RUNNER_TEMP 'build.rsp'
+          Set-Content -Path $responseFile -Encoding utf8 -Value @(
+            '/nologo', '/verbosity:minimal',
+            "/p:BuildTasksDirectory=`"$tools\DevAlm`"",
+            "/p:MetadataDirectory=`"$metadata`"",
+            "/p:FrameworkDirectory=`"$tools`"",
+            "/p:ReferenceFolder=`"$references`"",
+            "/p:ReferencePath=`"$tools`"",
+            "/p:OutputDirectory=`"$binaries`"")
+          msbuild Projects\BalsoftDataRefresh\BalsoftDataRefresh.sln "@$responseFile"
           if ($LASTEXITCODE -ne 0) { throw 'The build failed.' }
 
       - name: Create the deployable packages

@@ -4,8 +4,10 @@
 # Started by hand (Actions > Release > Run workflow) with the version, for example 1.0.1.
 # The X++ compiler and reference packages are licensed through Lifecycle Services and are not part of
 # this repository: the job downloads them from Azure Blob Storage, signed in through OpenID Connect.
-# The release environment holds AZURE_CLIENT_ID, AZURE_TENANT_ID, BUILD_TOOLS_ACCOUNT and
-# BUILD_TOOLS_CONTAINER; the container holds the four DevALM .nupkg files and CloudRuntimeDlls.zip.
+# The release environment holds the secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, BUILD_TOOLS_ACCOUNT and
+# BUILD_TOOLS_CONTAINER and the variable BUILD_REFERENCE_VERSION, the finance and operations version of
+# the packages in the container (for example 10.0.48). The container holds the four DevALM .nupkg files
+# and CloudRuntimeDlls.zip.
 
 name: Release
 
@@ -138,7 +140,14 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          REFERENCE_VERSION: ${{ vars.BUILD_REFERENCE_VERSION }}
         run: |
+          $nugets = Join-Path $env:RUNNER_TEMP 'NuGets'
+          $platform = ([xml] (Get-Content (Get-ChildItem "$nugets\Microsoft.Dynamics.AX.Platform.CompilerPackage\*.nuspec").FullName -Raw)).package.metadata.version
+          $application = ([xml] (Get-Content (Get-ChildItem "$nugets\Microsoft.Dynamics.AX.ApplicationSuite.DevALM.BuildXpp\*.nuspec").FullName -Raw)).package.metadata.version
+          if (-not $env:REFERENCE_VERSION) { throw 'Set the variable BUILD_REFERENCE_VERSION of the release environment.' }
+          Write-Host "Built against $($env:REFERENCE_VERSION): platform $platform, application $application"
+
           $release = Join-Path $env:RUNNER_TEMP 'Release'
           $unified = Join-Path $release "$env:NAME-Unified"
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -149,6 +158,8 @@ jobs:
             Write-Host "$(Split-Path $asset -Leaf): $([math]::Round((Get-Item $asset).Length / 1MB, 1)) MB"
           }
           $notes = @"
+          Built against finance and operations $env:REFERENCE_VERSION (platform $platform, application $application). Install it on $env:REFERENCE_VERSION or later.
+
           Deployable packages:
           - **$env:NAME-LCS.zip**: upload to the Asset library in Lifecycle Services and apply it to the environment.
           - **$env:NAME-Unified.zip**: for unified environments in the Power Platform admin center. Unzip it and run ``pac package deploy --package TemplatePackage.dll`` against the environment.

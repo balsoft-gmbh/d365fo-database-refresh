@@ -1,0 +1,159 @@
+# Builds the model from main and publishes a GitHub release with both deployable packages:
+# <name>-LCS.zip for Lifecycle Services and <name>-Unified.zip for unified environments.
+#
+# Started by hand (Actions > Release > Run workflow) with the version, for example 1.0.1.
+# The X++ compiler and reference packages are licensed through Lifecycle Services and are not part of
+# this repository: the job downloads them from Azure Blob Storage, signed in through OpenID Connect.
+# The release environment holds AZURE_CLIENT_ID, AZURE_TENANT_ID, BUILD_TOOLS_ACCOUNT and
+# BUILD_TOOLS_CONTAINER; the container holds the four DevALM .nupkg files and CloudRuntimeDlls.zip.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, for example 1.0.1'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and release
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+      NAME: BalsoftDataRefresh-${{ inputs.version }}
+    steps:
+      - name: Check the version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw "Enter the version as major.minor.patch, for example 1.0.1." }
+          gh release view "v$env:VERSION" --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release v$env:VERSION already exists." }
+          exit 0
+
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Sign in to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Download the build tools
+        shell: pwsh
+        env:
+          ACCOUNT: ${{ secrets.BUILD_TOOLS_ACCOUNT }}
+          CONTAINER: ${{ secrets.BUILD_TOOLS_CONTAINER }}
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'Download'
+          az storage blob download-batch --auth-mode login --account-name $env:ACCOUNT --source $env:CONTAINER `
+            --destination $download --only-show-errors --output none
+          if ($LASTEXITCODE -ne 0) { throw 'The build tools could not be downloaded.' }
+
+          # A .nupkg is a zip file: expand each into a folder named after the package, like nuget install -ExcludeVersion.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $nugets = Join-Path $env:RUNNER_TEMP 'NuGets'
+          $packages = @(Get-ChildItem $download -Filter *.nupkg)
+          if ($packages.Count -ne 4) { throw "Expected 4 DevALM packages, found $($packages.Count)." }
+          foreach ($package in $packages) {
+            [IO.Compression.ZipFile]::ExtractToDirectory($package.FullName, (Join-Path $nugets $package.BaseName))
+          }
+          [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $download 'CloudRuntimeDlls.zip'), $env:RUNNER_TEMP)
+          Remove-Item $download -Recurse -Force
+
+      - name: Set the model version
+        shell: pwsh
+        run: |
+          $parts = "$env:VERSION.0".Split('.')
+          foreach ($file in Get-ChildItem Metadata\*\Descriptor\*.xml) {
+            $descriptor = New-Object xml
+            $descriptor.PreserveWhitespace = $true
+            $descriptor.Load($file.FullName)
+            $descriptor.AxModelInfo.VersionMajor = $parts[0]
+            $descriptor.AxModelInfo.VersionMinor = $parts[1]
+            $descriptor.AxModelInfo.VersionBuild = $parts[2]
+            $descriptor.AxModelInfo.VersionRevision = $parts[3]
+            $descriptor.Save($file.FullName)
+            Write-Host "$($file.BaseName) $env:VERSION.0"
+          }
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
+        with:
+          msbuild-architecture: x64
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $nugets = Join-Path $env:RUNNER_TEMP 'NuGets'
+          $tools = Join-Path $nugets 'Microsoft.Dynamics.AX.Platform.CompilerPackage'
+          $metadata = Join-Path $env:GITHUB_WORKSPACE 'Metadata'
+          $binaries = Join-Path $env:RUNNER_TEMP 'Binaries'
+          New-Item -ItemType Directory -Force $binaries | Out-Null
+          # %3B keeps the list together as one MSBuild property value.
+          $references = @(
+            "$nugets\Microsoft.Dynamics.AX.Platform.DevALM.BuildXpp\ref\net40",
+            "$nugets\Microsoft.Dynamics.AX.Application.DevALM.BuildXpp\ref\net40",
+            "$nugets\Microsoft.Dynamics.AX.ApplicationSuite.DevALM.BuildXpp\ref\net40",
+            $metadata,
+            $binaries) -join '%3B'
+          msbuild Projects\BalsoftDataRefresh\BalsoftDataRefresh.sln /nologo /verbosity:minimal `
+            "/p:BuildTasksDirectory=$tools\DevAlm" "/p:MetadataDirectory=$metadata" "/p:FrameworkDirectory=$tools" `
+            "/p:ReferenceFolder=$references" "/p:ReferencePath=$tools" "/p:OutputDirectory=$binaries"
+          if ($LASTEXITCODE -ne 0) { throw 'The build failed.' }
+
+      - name: Create the deployable packages
+        shell: powershell
+        run: |
+          .\.github\scripts\New-DeployablePackages.ps1 `
+            -ToolsPath "$env:RUNNER_TEMP\NuGets\Microsoft.Dynamics.AX.Platform.CompilerPackage" `
+            -BinariesPath "$env:RUNNER_TEMP\Binaries" `
+            -CloudRuntimePath "$env:RUNNER_TEMP\CloudRuntimeDlls" `
+            -OutputPath "$env:RUNNER_TEMP\Release" `
+            -Name $env:NAME
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $release = Join-Path $env:RUNNER_TEMP 'Release'
+          $unified = Join-Path $release "$env:NAME-Unified"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [IO.Compression.ZipFile]::CreateFromDirectory($unified, "$unified.zip")
+          $assets = @("$release\$env:NAME-LCS.zip", "$unified.zip")
+          foreach ($asset in $assets) {
+            if (-not (Test-Path $asset)) { throw "$asset is missing." }
+            Write-Host "$(Split-Path $asset -Leaf): $([math]::Round((Get-Item $asset).Length / 1MB, 1)) MB"
+          }
+          $notes = @"
+          Deployable packages:
+          - **$env:NAME-LCS.zip**: upload to the Asset library in Lifecycle Services and apply it to the environment.
+          - **$env:NAME-Unified.zip**: for unified environments in the Power Platform admin center. Unzip it and run ``pac package deploy --package TemplatePackage.dll`` against the environment.
+          "@
+          gh release create "v$env:VERSION" @assets --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
+            --title "Balsoft Data Refresh $env:VERSION" --notes $notes --generate-notes --draft
+          if ($LASTEXITCODE -ne 0) { throw 'The release could not be created.' }
+          gh release edit "v$env:VERSION" --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) { throw 'The release could not be published.' }

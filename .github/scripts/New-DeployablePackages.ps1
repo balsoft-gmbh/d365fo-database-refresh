@@ -78,7 +78,17 @@ try {
         'Microsoft.Xrm.Tooling.PackageDeployment.CrmPackageCore', 'Microsoft.Dynamics.VSExtension.Shared', 'Microsoft.ApplicationInsights',
         'Microsoft.PowerPlatform.VSShared.Util', 'Microsoft.Xrm.Tooling.Connector', 'Newtonsoft.Json', 'Microsoft.Dynamics.AX.DesignTime.Telemetry2'
     foreach ($library in $libraries) {
-        Add-Type -Path (Join-Path $CloudRuntimePath "$library.dll")
+        try {
+            Add-Type -Path (Join-Path $CloudRuntimePath "$library.dll")
+        }
+        catch {
+            # The assembly is loaded even then; only types that need assemblies outside this set are missing.
+            if ($_.FullyQualifiedErrorId -notlike 'System.Reflection.ReflectionTypeLoadException*') {
+                throw
+            }
+            $missing = @($_.Exception.LoaderExceptions | ForEach-Object { $_.Message } | Select-Object -Unique -First 3)
+            Write-Host "$library loaded without some of its types: $($missing -join ' | ')"
+        }
     }
 
     $unifiedBuilder = @"

@@ -8,10 +8,14 @@ using System.ComponentModel.Composition;
 /// <summary>
 /// Writes environment specific values into any table field: integration URLs, e-mail settings,
 /// storage accounts, print destinations. Values can come from a secret passed to the service call.
+/// Encrypted fields, such as the SMTP password, take their value only from a secret.
 /// </summary>
 /// <remarks>
 /// Values are written with doUpdate, like a data import that skips business logic: the task
 /// restores technical settings and must not start the processes an update would trigger.
+/// Encrypted fields get the value through the standard encryption and are saved with update, like
+/// <c>SysCertificateRotationJob</c> does, so the encryption log of the table is written.
+/// A rule that cannot be applied fails the task, but the other rules are still written.
 /// </remarks>
 [ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
 [ExportMetadata(classStr(BDRITaskType), 'FieldValues')]
@@ -49,7 +53,16 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
             order by RecId
             where fieldValue.EnvironmentId == environmentId
         {
-            this.apply(fieldValue);
+            int infologStart = infologLine();
+
+            try
+            {
+                this.apply(fieldValue);
+            }
+            catch (Exception::Error)
+            {
+                context.logError(strFmt("@BDR:MsgFieldValueNotSet", fieldValue.TableName, fieldValue.FieldName, BDRJobProcessor::infologText(infologStart)));
+            }
         }
 
         context.logInfo(strFmt("@BDR:MsgRecordsUpdated", context.recordsAffected()));
@@ -84,16 +97,23 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
             return;
         }
 
+        boolean encrypted = BDRTaskTypeFieldValues::isEncryptedField(tableId, fieldId);
+
+        if (encrypted && !_fieldValue.SecretName)
+        {
+            throw error(strFmt("@BDR:ErrEncryptedFieldNeedsSecret", _fieldValue.TableName, _fieldValue.FieldName));
+        }
+
         str valueText = _fieldValue.SecretName ? context.secret(_fieldValue.SecretName) : _fieldValue.FieldValue;
         // A secret value must never appear in an error message, which ends up in the job log and the service result.
         str displayText = _fieldValue.SecretName ? strFmt('<%1>', _fieldValue.SecretName) : _fieldValue.FieldValue;
-        anytype value = BDRTaskTypeFieldValues::convert(tableId, fieldId, valueText, displayText);
+        anytype value = encrypted ? valueText : BDRTaskTypeFieldValues::convert(tableId, fieldId, valueText, displayText);
         anytype keyValue = keyFieldId ? BDRTaskTypeFieldValues::convert(tableId, keyFieldId, _fieldValue.KeyValue) : '';
 
         if (!dictTable.dataPrCompany())
         {
             // Shared table: one pass, the companies of the row do not apply.
-            this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue);
+            this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue, encrypted);
             return;
         }
 
@@ -113,7 +133,7 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
 
             changecompany(company)
             {
-                this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue);
+                this.updateRecords(dictTable, fieldId, value, keyFieldId, keyValue, _fieldValue, encrypted);
             }
         }
     }
@@ -127,7 +147,7 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
     /// <summary>
     /// Updates all records of the current company, or the records where the key field has the key value.
     /// </summary>
-    private void updateRecords(DictTable _dictTable, FieldId _fieldId, anytype _value, FieldId _keyFieldId, anytype _keyValue, BDRFieldValue _fieldValue)
+    private void updateRecords(DictTable _dictTable, FieldId _fieldId, anytype _value, FieldId _keyFieldId, anytype _keyValue, BDRFieldValue _fieldValue, boolean _encrypted)
     {
         Common record = _dictTable.makeRecord();
         BDRRecordsAffected updated;
@@ -141,8 +161,7 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
             while select record
                 where record.(_keyFieldId) == _keyValue
             {
-                record.(_fieldId) = _value;
-                record.doUpdate();
+                this.writeValue(record, _fieldId, _value, _encrypted);
                 updated++;
             }
 
@@ -155,8 +174,7 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
         {
             while select record
             {
-                record.(_fieldId) = _value;
-                record.doUpdate();
+                this.writeValue(record, _fieldId, _value, _encrypted);
                 updated++;
             }
         }
@@ -164,6 +182,36 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
         ttscommit;
 
         context.addRecordsAffected(updated);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>writeValue</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Writes the value into the field of one record and saves the record.
+    /// </summary>
+    private void writeValue(Common _record, FieldId _fieldId, anytype _value, boolean _encrypted)
+    {
+        if (!_encrypted)
+        {
+            _record.(_fieldId) = _value;
+            _record.doUpdate();
+            return;
+        }
+
+        if (new DictField(_record.TableId, _fieldId).baseType() == Types::Container)
+        {
+            Global::editEncryptedField(_record, _value, _fieldId, true);
+        }
+        else
+        {
+            Global::editEncryptedStringField(_record, _value, _fieldId, true);
+        }
+
+        _record.update();
     }
 
 ]]></Source>
@@ -297,6 +345,69 @@ public final class BDRTaskTypeFieldValues implements BDRITaskType
         }
 
         return false;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isTypeSupported</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether the task can write into a field at all, whatever the value is.
+    /// </summary>
+    /// <param name = "_tableId">The table.</param>
+    /// <param name = "_fieldId">The field.</param>
+    /// <returns>True for encrypted fields and for the field types <c>convert</c> handles.</returns>
+    public static boolean isTypeSupported(TableId _tableId, FieldId _fieldId)
+    {
+        if (BDRTaskTypeFieldValues::isEncryptedField(_tableId, _fieldId))
+        {
+            return true;
+        }
+
+        switch (new DictField(_tableId, _fieldId).baseType())
+        {
+            case Types::String:
+            case Types::RString:
+            case Types::VarString:
+            case Types::Integer:
+            case Types::Int64:
+            case Types::Real:
+            case Types::Date:
+            case Types::UtcDateTime:
+            case Types::Guid:
+            case Types::Enum:
+                return true;
+        }
+
+        return false;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isEncryptedField</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Checks whether a field is stored encrypted, recognized like <c>SysCertificateRotationJob</c> does.
+    /// </summary>
+    /// <param name = "_tableId">The table.</param>
+    /// <param name = "_fieldId">The field.</param>
+    /// <returns>True for the types <c>EncryptedField</c> and <c>EncryptedString</c> and the types that extend them.</returns>
+    public static boolean isEncryptedField(TableId _tableId, FieldId _fieldId)
+    {
+        DictField dictField = new DictField(_tableId, _fieldId);
+        SysDictType dictType = dictField && dictField.typeId() ? new SysDictType(dictField.typeId()) : null;
+
+        if (!dictType)
+        {
+            return false;
+        }
+
+        return dictType.id() == extendedTypeNum(EncryptedField) || dictType.isExtending(extendedTypeNum(EncryptedField))
+            || dictType.id() == extendedTypeNum(EncryptedString) || dictType.isExtending(extendedTypeNum(EncryptedString));
     }
 
 ]]></Source>

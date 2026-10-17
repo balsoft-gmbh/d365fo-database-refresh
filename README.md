@@ -19,7 +19,7 @@ System administration > Workspaces.
 | Enable users | Enables the users listed for the environment; every other user keeps its state | All users except Admin disabled |
 | Assign security roles | Assigns roles per environment, by AOT name | Roles copied from the source |
 | Cancel pending workflows | Cancels the pending workflow instances of the listed workflows (or all) in all or in selected companies | Instances stay pending |
-| Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings, integration settings) | Manual or data package |
+| Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings including the SMTP password, integration settings) | Manual or data package |
 | Create business event endpoints | Creates endpoints of every Azure type and activates their business events | Endpoints removed |
 | Release batch jobs | Puts the listed batch jobs back to Waiting | All batch jobs on hold |
 | Clean up data | Deletes records older than N days per table, or empties a table, in all or in selected companies | Transactionless copy (PPAC only, all transactions) |
@@ -107,9 +107,18 @@ what parameter tables need. With a key field only the matching records are updat
 **Pipeline secret name** is only for sensitive values: it matches an entry in `Secrets` in the
 service request, and Value to write stays empty.
 
+Encrypted fields, such as `SysEmailSMTPPassword.Password` (the SMTP password in Email parameters),
+take their value only from a pipeline secret. The task writes it through the standard encryption,
+like the Email parameters form does, so the value works in the refreshed environment. A refresh
+clears these fields because the source environment's encryption cannot be read on the target.
+
 A row is checked when it is saved, so it cannot fail later during a refresh: the table must store
 data (no temporary table, view, map or system table), the field must not be a system field
-(RecId, DataAreaId and the like), and Value to write and Has value must fit their field types. An enum takes its name or number; an empty value is only valid for a field that accepts it.
+(RecId, DataAreaId and the like), the field type must be text, number, date, date and time, GUID,
+enum or encrypted (also for a row with a pipeline secret), and Value to write and Has value must
+fit their field types. An enum takes its name or number; an empty value is only valid for a field that accepts it.
+A row that still fails during a refresh, for example because a secret is missing or its value
+does not fit an enum field, fails the task, and the other rows are still written.
 
 ### Data cleanup
 

@@ -30,8 +30,9 @@ jobs:
   release:
     name: Build and release
     if: github.ref == 'refs/heads/main'
-    # The 10.0.48 X++ compiler package needs MSBuild of Visual Studio 2022; on windows-latest (Visual Studio 2026) Xppc.exe exits with -1.
-    runs-on: windows-2025
+    # The 10.0.48 X++ compiler package needs MSBuild of Visual Studio 2022, which only windows-2022 still has;
+    # on Visual Studio 2026 (windows-latest, windows-2025) Xppc.exe exits with -1.
+    runs-on: windows-2022
     environment: release
     timeout-minutes: 90
     permissions:

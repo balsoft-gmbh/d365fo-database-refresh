@@ -87,7 +87,20 @@ public class BDRFieldValue extends common
         FieldId fieldId = tableId ? fieldName2Id(tableId, this.FieldName) : 0;
         FieldId keyFieldId = tableId && this.KeyFieldName ? fieldName2Id(tableId, this.KeyFieldName) : 0;
 
-        if (fieldId && !this.SecretName && !BDRTaskTypeFieldValues::canConvert(tableId, fieldId, this.FieldValue))
+        if (fieldId && BDRTaskTypeFieldValues::isEncryptedField(tableId, fieldId))
+        {
+            // The setup is stored as plain text, so an encrypted field only takes a pipeline secret.
+            if (!this.SecretName)
+            {
+                ret = checkFailed(strFmt("@BDR:ErrEncryptedFieldNeedsSecret", this.TableName, this.FieldName)) && ret;
+            }
+        }
+        else if (fieldId && !BDRTaskTypeFieldValues::isTypeSupported(tableId, fieldId))
+        {
+            // Checked without the value as well: a secret only arrives at run time.
+            ret = checkFailed(strFmt("@BDR:ErrFieldTypeNotSupported", this.TableName, this.FieldName)) && ret;
+        }
+        else if (fieldId && !this.SecretName && !BDRTaskTypeFieldValues::canConvert(tableId, fieldId, this.FieldValue))
         {
             ret = checkFailed(strFmt("@BDR:ErrValueNotConvertible", this.FieldValue, this.TableName, this.FieldName)) && ret;
         }

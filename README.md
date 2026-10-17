@@ -19,7 +19,7 @@ System administration > Workspaces.
 | Enable users | Enables the users listed for the environment; every other user keeps its state | All users except Admin disabled |
 | Assign security roles | Assigns roles per environment, by AOT name | Roles copied from the source |
 | Cancel pending workflows | Cancels the pending workflow instances of the listed workflows (or all) in all or in selected companies | Instances stay pending |
-| Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings, integration settings) | Manual or data package |
+| Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings including the SMTP password, integration settings) | Manual or data package |
 | Create business event endpoints | Creates endpoints of every Azure type and activates their business events | Endpoints removed |
 | Release batch jobs | Puts the listed batch jobs back to Waiting | All batch jobs on hold |
 | Clean up data | Deletes records older than N days per table, or empties a table, in all or in selected companies | Transactionless copy (PPAC only, all transactions) |
@@ -68,6 +68,18 @@ environment or the LCS environment ID of an LCS environment, read from
   of the call. A task that needs a pipeline secret (field values with a secret, business event
   endpoints) after such a task is refused before the job starts.
 
+## Download
+
+Every [release](https://github.com/balsoft-gmbh/d365fo-database-refresh/releases) has two deployable
+packages, built from the tagged source by the release workflow:
+
+- `BalsoftDataRefresh-<version>-LCS.zip`: upload it to the Asset library in Lifecycle Services and
+  apply it to the environment.
+- `BalsoftDataRefresh-<version>-Unified.zip`: for unified environments in the Power Platform admin
+  center. Unzip it and run `pac package deploy --package TemplatePackage.dll` against the environment.
+
+To compile the model in your own pipeline, start from `Pipelines/bdr-build.yml`.
+
 ## Setup
 
 1. Deploy the model and assign the role **Database refresh administrator**.
@@ -107,9 +119,18 @@ what parameter tables need. With a key field only the matching records are updat
 **Pipeline secret name** is only for sensitive values: it matches an entry in `Secrets` in the
 service request, and Value to write stays empty.
 
+Encrypted fields, such as `SysEmailSMTPPassword.Password` (the SMTP password in Email parameters),
+take their value only from a pipeline secret. The task writes it through the standard encryption,
+like the Email parameters form does, so the value works in the refreshed environment. A refresh
+clears these fields because the source environment's encryption cannot be read on the target.
+
 A row is checked when it is saved, so it cannot fail later during a refresh: the table must store
 data (no temporary table, view, map or system table), the field must not be a system field
-(RecId, DataAreaId and the like), and Value to write and Has value must fit their field types. An enum takes its name or number; an empty value is only valid for a field that accepts it.
+(RecId, DataAreaId and the like), the field type must be text, number, date, date and time, GUID,
+enum or encrypted (also for a row with a pipeline secret), and Value to write and Has value must
+fit their field types. An enum takes its name or number; an empty value is only valid for a field that accepts it.
+A row that still fails during a refresh, for example because a secret is missing or its value
+does not fit an enum field, fails the task, and the other rows are still written.
 
 ### Data cleanup
 
@@ -260,6 +281,8 @@ environment with its approval.
 | `Pipelines/bdr-release.yml` | Deploys the unified package of the latest build to a Power Platform environment through a service connection |
 | `Pipelines/copy-and-refresh.yml` | Sample: copy an environment, then run Database refresh on the copy through the service |
 | `Pipelines/scripts/Invoke-DatabaseRefresh.ps1` | Calls the service, waits for the job and fails on errors; used by the sample pipeline |
+| `.github/workflows/release.yml` | GitHub Actions: builds main and publishes a release with both deployable packages |
+| `.github/scripts/New-DeployablePackages.ps1` | Creates the two deployable packages from the compiler output; used by the release workflow |
 
 ## License
 

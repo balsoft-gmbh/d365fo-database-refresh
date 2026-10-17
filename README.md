@@ -68,6 +68,18 @@ environment or the LCS environment ID of an LCS environment, read from
   of the call. A task that needs a pipeline secret (field values with a secret, business event
   endpoints) after such a task is refused before the job starts.
 
+## Download
+
+Every [release](https://github.com/balsoft-gmbh/d365fo-database-refresh/releases) has two deployable
+packages, built from the tagged source by the release workflow:
+
+- `BalsoftDataRefresh-<version>-LCS.zip`: upload it to the Asset library in Lifecycle Services and
+  apply it to the environment.
+- `BalsoftDataRefresh-<version>-Unified.zip`: for unified environments in the Power Platform admin
+  center. Unzip it and run `pac package deploy --package TemplatePackage.dll` against the environment.
+
+To compile the model in your own pipeline, start from `Pipelines/bdr-build.yml`.
+
 ## Setup
 
 1. Deploy the model and assign the role **Database refresh administrator**.
@@ -269,6 +281,8 @@ environment with its approval.
 | `Pipelines/bdr-release.yml` | Deploys the unified package of the latest build to a Power Platform environment through a service connection |
 | `Pipelines/copy-and-refresh.yml` | Sample: copy an environment, then run Database refresh on the copy through the service |
 | `Pipelines/scripts/Invoke-DatabaseRefresh.ps1` | Calls the service, waits for the job and fails on errors; used by the sample pipeline |
+| `.github/workflows/release.yml` | GitHub Actions: builds main and publishes a release with both deployable packages |
+| `.github/scripts/New-DeployablePackages.ps1` | Creates the two deployable packages from the compiler output; used by the release workflow |
 
 ## License
 

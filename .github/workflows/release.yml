@@ -67,6 +67,7 @@ jobs:
           CONTAINER: ${{ secrets.BUILD_TOOLS_CONTAINER }}
         run: |
           $download = Join-Path $env:RUNNER_TEMP 'Download'
+          New-Item -ItemType Directory -Force -Path $download | Out-Null
           az storage blob download-batch --auth-mode login --account-name $env:ACCOUNT --source $env:CONTAINER `
             --destination $download --only-show-errors --output none
           if ($LASTEXITCODE -ne 0) { throw 'The build tools could not be downloaded.' }

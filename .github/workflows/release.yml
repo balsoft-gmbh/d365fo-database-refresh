@@ -1,7 +1,8 @@
 # Builds the model from main and publishes a GitHub release with both deployable packages:
 # <name>-LCS.zip for Lifecycle Services and <name>-Unified.zip for unified environments.
 #
-# Started by hand (Actions > Release > Run workflow) with the version, for example 1.0.1.
+# Started by hand (Actions > Release > Run workflow) with the version, for example 1.0.1. The model
+# descriptors in the source must already carry that version as 1.0.1.0, otherwise the run stops.
 # The X++ compiler and reference packages are licensed through Lifecycle Services and are not part of
 # this repository: the job downloads them from Azure Blob Storage, signed in through OpenID Connect.
 # The release environment holds the secrets AZURE_CLIENT_ID, AZURE_TENANT_ID, BUILD_TOOLS_ACCOUNT and
@@ -56,6 +57,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check the model version
+        shell: pwsh
+        run: |
+          $expected = "$env:VERSION.0"
+          $descriptors = @(Get-ChildItem Metadata\*\Descriptor\*.xml)
+          if ($descriptors.Count -eq 0) { throw 'No model descriptor found under Metadata.' }
+          foreach ($file in $descriptors) {
+            $model = ([xml] (Get-Content $file.FullName -Raw)).AxModelInfo
+            $actual = '{0}.{1}.{2}.{3}' -f $model.VersionMajor, $model.VersionMinor, $model.VersionBuild, $model.VersionRevision
+            if ($actual -ne $expected) { throw "$($file.Name) has version $actual, the release needs $expected. Update the descriptor first." }
+            Write-Host "$($file.BaseName) $actual"
+          }
+
       - name: Sign in to Azure
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
@@ -85,22 +99,6 @@ jobs:
           }
           [IO.Compression.ZipFile]::ExtractToDirectory((Join-Path $download 'CloudRuntimeDlls.zip'), $env:RUNNER_TEMP)
           Remove-Item $download -Recurse -Force
-
-      - name: Set the model version
-        shell: pwsh
-        run: |
-          $parts = "$env:VERSION.0".Split('.')
-          foreach ($file in Get-ChildItem Metadata\*\Descriptor\*.xml) {
-            $descriptor = New-Object xml
-            $descriptor.PreserveWhitespace = $true
-            $descriptor.Load($file.FullName)
-            $descriptor.AxModelInfo.VersionMajor = $parts[0]
-            $descriptor.AxModelInfo.VersionMinor = $parts[1]
-            $descriptor.AxModelInfo.VersionBuild = $parts[2]
-            $descriptor.AxModelInfo.VersionRevision = $parts[3]
-            $descriptor.Save($file.FullName)
-            Write-Host "$($file.BaseName) $env:VERSION.0"
-          }
 
       - name: Set up MSBuild
         uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3

@@ -173,7 +173,7 @@ jobs:
           - **$env:NAME-Unified.zip**: for unified environments in the Power Platform admin center. Unzip it and run ``pac package deploy --package TemplatePackage.dll`` against the environment.
           "@
           gh release create "v$env:VERSION" @assets --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
-            --title "Balsoft Data Refresh $env:VERSION" --notes $notes --generate-notes --draft
+            --title "Balsoft Data Refresh $env:VERSION (model $env:VERSION.0)" --notes $notes --generate-notes --draft
           if ($LASTEXITCODE -ne 0) { throw 'The release could not be created.' }
           gh release edit "v$env:VERSION" --repo $env:GITHUB_REPOSITORY --draft=false
           if ($LASTEXITCODE -ne 0) { throw 'The release could not be published.' }

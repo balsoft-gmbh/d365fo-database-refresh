@@ -5,6 +5,10 @@
 # (AXDeployableRuntime_*.zip) and the Power Platform Unified / cloud package
 # (CloudDeployablePackage_*), so the same build can target a PPAC environment.
 # Models are auto-detected from Metadata/*/Descriptor/*.xml.
+# The run is named after the release version in the BDR descriptor plus the run
+# ID (descriptor 1.0.2.0, run 266: 1.0.2.266), and that number is written into
+# the model, as Microsoft recommends for ISV models, so About > Loaded packages
+# shows which build is installed. GitHub releases ship <version>.0 instead.
 #
 # Deployment to a PPAC environment is a separate release pipeline.
 # Requires the "Dynamics 365 Finance and Operations Tools" extension from the
@@ -14,7 +18,7 @@
 # package), stored without version in the file name (for example
 # Microsoft.Dynamics.AX.Platform.CompilerPackage.nupkg).
 
-name: 1.0.0$(Rev:.r)
+name: $(Build.BuildId)
 
 trigger: none
 
@@ -89,13 +93,22 @@ steps:
       Write-Host "##vso[task.setvariable variable=PrimaryModel]$($models[0])"
     displayName: 'Detect models'
 
-  # 4. Stamp model version from the build number.
+  # 4. Name the build after the release version in the descriptor and stamp that
+  #    number into the model. Lowest layer 8 includes BDR's own ISV layer, which the
+  #    task skips by default. Each part of a model version must stay below 65535.
+  - powershell: |
+      $model = ([xml] (Get-Content "$(MetadataPath)\BDR\Descriptor\BDR.xml" -Raw)).AxModelInfo
+      $buildNumber = '{0}.{1}.{2}.{3}' -f $model.VersionMajor, $model.VersionMinor, $model.VersionBuild, $(Build.BuildId)
+      Write-Host "Build number $buildNumber"
+      Write-Host "##vso[build.updatebuildnumber]$buildNumber"
+    displayName: 'Set build number from the model version'
+
   - task: XppUpdateModelVersion@0
     displayName: 'Update Model Version'
     inputs:
       XppSourcePath: '$(Build.SourcesDirectory)'
       XppDescriptorSearch: '**\Descriptor\*.xml'
-      XppLayer: '10'
+      XppLayer: '8'
       VersionNumber: '$(Build.BuildNumber)'
 
   # 5. Compile the X++ solution against the DevALM reference packages.

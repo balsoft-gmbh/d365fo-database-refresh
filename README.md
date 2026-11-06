@@ -20,8 +20,8 @@ System administration > Workspaces.
 | Assign security roles | Assigns roles per environment, by AOT name | Roles copied from the source |
 | Cancel pending workflows | Cancels the pending workflow instances of the listed workflows (or all) in all or in selected companies | Instances stay pending |
 | Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings including the SMTP password, integration settings) | Manual or data package |
-| Mask customer and vendor e-mails | Replaces the e-mail addresses of customers, vendors and their contact persons (and the copies on sales orders, quotations and purchase orders) with a test address | Real addresses stay |
-| Redirect print destinations | Sends print management e-mail destinations to a test address and turns off the e-mail destination of electronic reporting formats | Documents mailed to real recipients |
+| Mask customer and vendor e-mails | Replaces the e-mail addresses of customers, vendors and their contact persons (and the copies on sales orders, quotations and purchase orders) with a test address | An LCS refresh does not copy address book e-mails; the e-mails on orders are not on Microsoft's list |
+| Redirect print destinations | Sends print management e-mail destinations to a test address and turns off the e-mail destination of electronic reporting formats | An LCS refresh does not copy print management settings; ER e-mail destinations are not on Microsoft's list |
 | Create business event endpoints | Creates endpoints of every Azure type and activates their business events | Endpoints removed |
 | Release batch jobs | Puts the listed batch jobs back to Waiting | All batch jobs on hold |
 | Clean up data | Deletes records older than N days per table, or empties a table, in all or in selected companies | Transactionless copy (PPAC only, all transactions) |
@@ -160,6 +160,9 @@ every typed address in To and Cc becomes the test address. Purpose tokens such a
 stay; they resolve to the masked addresses of E-mail masking when a document is printed.
 Electronic reporting formats cannot be redirected from outside ER, so their e-mail destination is
 turned off; archive, file, screen and printer destinations of the same file stay as they are.
+
+The task works on what is in the environment. It does not bring back print management settings
+that a refresh did not copy ([Microsoft's list](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/database/database-refresh)).
 
 ### Data cleanup
 

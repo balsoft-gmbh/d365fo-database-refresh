@@ -105,6 +105,24 @@
 			<Forms />
 		</AxSecurityEntryPointReference>
 		<AxSecurityEntryPointReference>
+			<Name>BDRMaskEmailRule</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRMaskEmailRule</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
+			<Name>BDRPrintDestinationRule</Name>
+			<Grant>
+				<Read>Allow</Read>
+			</Grant>
+			<ObjectName>BDRPrintDestinationRule</ObjectName>
+			<ObjectType>MenuItemDisplay</ObjectType>
+			<Forms />
+		</AxSecurityEntryPointReference>
+		<AxSecurityEntryPointReference>
 			<Name>BDREndpoint</Name>
 			<Grant>
 				<Read>Allow</Read>

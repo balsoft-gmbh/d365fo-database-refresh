@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypeMaskEmails</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Masks the e-mail addresses of customers, vendors and their contact persons, so mails from
+/// the copy cannot reach them. Addresses on a location that a worker, a user or a legal entity
+/// also uses are kept, so workflow and internal mails still arrive.
+/// </summary>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'MaskEmails')]
+public final class BDRTaskTypeMaskEmails implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'MaskEmails';
+
+    BDRTaskContext context;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypeMaskEmails::Name, literalStr("@BDR:TaskMaskEmails"), 45, true, menuItemDisplayStr(BDRMaskEmailRule));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run(BDRTaskContext _context)
+    {
+        BDRMaskEmailRule rule;
+
+        context = _context;
+
+        while select rule
+            order by RecId
+            where rule.EnvironmentId == context.environmentId()
+        {
+            Set companies = rule.companies();
+
+            if (!companies.elements())
+            {
+                context.logWarning(strFmt("@BDR:MsgNoCompaniesSkipped", rule.TestAddress));
+                continue;
+            }
+
+            this.maskAddresses(rule, BDRMaskEmail::companyContainer(companies));
+
+            if (rule.OrderCopies)
+            {
+                this.maskOrderCopies(rule, companies);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>maskAddresses</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Masks the e-mail addresses of the parties of the rule that no excluded party shares.
+    /// </summary>
+    private void maskAddresses(BDRMaskEmailRule _rule, container _companies)
+    {
+        BDRMaskTmp parties;
+        BDRMaskTmp locations;
+        BDRMaskTmp excludedLocations;
+        DirPartyLocation partyLocation;
+        LogisticsElectronicAddress address;
+        BDRRecordsAffected updated;
+
+        this.collectParties(_rule, _companies, parties);
+
+        insert_recordset locations (RefRecId, IsExcluded)
+            select Location from partyLocation
+                join IsExcluded from parties
+                    where parties.RefRecId == partyLocation.Party;
+
+        // A location that a worker, a user or a legal entity also uses keeps its addresses.
+        excludedLocations.linkPhysicalTableInstance(locations);
+        delete_from locations
+            where locations.IsExcluded == NoYes::No
+            exists join excludedLocations
+                where excludedLocations.RefRecId == locations.RefRecId
+                    && excludedLocations.IsExcluded == NoYes::Yes;
+
+        ttsbegin;
+
+        address.skipDatabaseLog(true);
+        address.skipEvents(true);
+
+        while select forupdate address
+            where address.Type == LogisticsElectronicAddressMethodType::Email
+            exists join locations
+                where locations.RefRecId == address.Location
+                    && locations.IsExcluded == NoYes::No
+        {
+            str masked = BDRMaskEmail::maskedAddress(_rule.TestAddress, int642Str(address.RecId));
+
+            if (address.Locator != masked)
+            {
+                // Only the text changes: update() maintains primary flags and the presence cache, which stay as they are.
+                address.Locator = masked;
+                address.doUpdate();
+                updated++;
+            }
+        }
+
+        ttscommit;
+
+        context.addRecordsAffected(updated);
+        context.logInfo(strFmt("@BDR:MsgEmailsMasked", updated, tableId2Name(tableNum(LogisticsElectronicAddress))));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>collectParties</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Fills the party list: the parties to mask with IsExcluded No, and the workers, users and
+    /// legal entities with IsExcluded Yes.
+    /// </summary>
+    private void collectParties(BDRMaskEmailRule _rule, container _companies, BDRMaskTmp _parties)
+    {
+        Set accountParties = new Set(Types::Int64);
+        Set maskedParties = new Set(Types::Int64);
+        Set excludedParties = new Set(Types::Int64);
+        CustTable custTable;
+        VendTable vendTable;
+        ContactPerson contactPerson;
+        HcmWorker hcmWorker;
+        DirPersonUser dirPersonUser;
+        CompanyInfo companyInfo;
+
+        while select crossCompany : _companies Party from custTable
+            group by Party
+        {
+            accountParties.add(custTable.Party);
+            if (_rule.Customers)
+            {
+                maskedParties.add(custTable.Party);
+            }
+        }
+
+        while select crossCompany : _companies Party from vendTable
+            group by Party
+        {
+            accountParties.add(vendTable.Party);
+            if (_rule.Vendors)
+            {
+                maskedParties.add(vendTable.Party);
+            }
+        }
+
+        if (_rule.ContactPersons)
+        {
+            while select crossCompany : _companies Party, ContactForParty from contactPerson
+                group by Party, ContactForParty
+            {
+                if (accountParties.in(contactPerson.ContactForParty))
+                {
+                    maskedParties.add(contactPerson.Party);
+                }
+            }
+        }
+
+        while select Person from hcmWorker
+        {
+            excludedParties.add(hcmWorker.Person);
+        }
+
+        // Every user link, also the ones that are not valid today.
+        utcdatetime validFrom = DateTimeUtil::minValue();
+        utcdatetime validTo = DateTimeUtil::maxValue();
+
+        while select validTimeState(validFrom, validTo) PersonParty from dirPersonUser
+        {
+            excludedParties.add(dirPersonUser.PersonParty);
+        }
+
+        while select RecId from companyInfo
+        {
+            excludedParties.add(companyInfo.RecId);
+        }
+
+        RecordInsertList insertList = new RecordInsertList(tableNum(BDRMaskTmp), true, true, true, false, true, _parties);
+        SetEnumerator enumerator = maskedParties.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            if (!excludedParties.in(enumerator.current()))
+            {
+                this.addParty(insertList, enumerator.current(), NoYes::No);
+            }
+        }
+
+        enumerator = excludedParties.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            this.addParty(insertList, enumerator.current(), NoYes::Yes);
+        }
+
+        insertList.insertDatabase();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>addParty</Name>
+				<Source><![CDATA[
+    private void addParty(RecordInsertList _insertList, RefRecId _party, NoYes _isExcluded)
+    {
+        BDRMaskTmp party;
+
+        party.RefRecId = _party;
+        party.IsExcluded = _isExcluded;
+        _insertList.add(party);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>maskOrderCopies</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Masks the e-mail that sales orders, sales quotations and purchase orders copied from the account.
+    /// </summary>
+    private void maskOrderCopies(BDRMaskEmailRule _rule, Set _companies)
+    {
+        SetEnumerator enumerator = _companies.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            changecompany(enumerator.current())
+            {
+                if (_rule.Customers)
+                {
+                    this.maskField(_rule, tableNum(SalesTable), fieldNum(SalesTable, Email));
+                    this.maskField(_rule, tableNum(SalesQuotationTable), fieldNum(SalesQuotationTable, Email));
+                }
+
+                if (_rule.Vendors)
+                {
+                    this.maskField(_rule, tableNum(PurchTable), fieldNum(PurchTable, Email));
+                }
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>maskField</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Masks a non-empty e-mail field in every record of the current company.
+    /// </summary>
+    private void maskField(BDRMaskEmailRule _rule, TableId _tableId, FieldId _fieldId)
+    {
+        Common record = new DictTable(_tableId).makeRecord();
+        str tableName = tableId2Name(_tableId);
+        BDRRecordsAffected updated;
+
+        ttsbegin;
+
+        record.selectForUpdate(true);
+        record.skipDatabaseLog(true);
+        record.skipEvents(true);
+
+        while select record
+            where record.(_fieldId) != ''
+        {
+            str masked = BDRMaskEmail::maskedAddress(_rule.TestAddress, tableName + '-' + int642Str(record.RecId));
+
+            if (record.(_fieldId) != masked)
+            {
+                record.(_fieldId) = masked;
+                record.doUpdate();
+                updated++;
+            }
+        }
+
+        ttscommit;
+
+        if (updated)
+        {
+            context.addRecordsAffected(updated);
+            context.logInfo(strFmt("@BDR:MsgEmailsMasked", updated, strFmt('%1 (%2)', tableName, curExt())));
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

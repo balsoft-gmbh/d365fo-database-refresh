@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRPrintDestinationRule</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Print destinations of an environment: the test address that print management e-mail
+/// destinations get, and whether electronic reporting e-mail destinations are turned off.
+/// </summary>
+public class BDRPrintDestinationRule extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.AllCompanies = NoYes::Yes;
+        this.PrintManagement = NoYes::Yes;
+        this.ElectronicReporting = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        if (!BDRMaskEmail::isValidTestAddress(this.TestAddress, 80))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrInvalidTestAddress", this.TestAddress)) && ret;
+        }
+
+        if (!this.PrintManagement && !this.ElectronicReporting)
+        {
+            ret = checkFailed("@BDR:ErrPrintNothingSelected") && ret;
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>update</Name>
+				<Source><![CDATA[
+
+    public void update()
+    {
+        super();
+
+        // All companies replaces the list of selected companies.
+        if (this.AllCompanies)
+        {
+            BDRSetupCompany::deleteFor(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>delete</Name>
+				<Source><![CDATA[
+
+    public void delete()
+    {
+        super();
+
+        BDRSetupCompany::deleteFor(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies this row applies to.
+    /// </summary>
+    /// <returns>A set of company IDs.</returns>
+    public Set companies()
+    {
+        return BDRSetupCompany::companies(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyScope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies; empty when the row is for all companies.
+    /// </summary>
+    public display Description companyScope()
+    {
+        return BDRSetupCompany::scope(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canChooseCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Customers, vendors, orders and print settings belong to a company, so companies can always be chosen.
+    /// </summary>
+    public boolean canChooseCompanies()
+    {
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:PrintDestinationRules</DeveloperDocumentation>
+	<Label>@BDR:PrintDestinationRules</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>TestAddress</TitleField1>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentAddressIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentAddressIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentAddressIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TestAddress</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>PrintManagement</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ElectronicReporting</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>TestAddress</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>PrintManagement</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ElectronicReporting</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>TestAddress</Name>
+			<ExtendedDataType>Email</ExtendedDataType>
+			<HelpText>@BDR:TestAddressHelp</HelpText>
+			<Label>@BDR:TestAddress</Label>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>PrintManagement</Name>
+			<HelpText>@BDR:RedirectPrintManagementHelp</HelpText>
+			<Label>@BDR:RedirectPrintManagement</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>ElectronicReporting</Name>
+			<HelpText>@BDR:DisableErEmailHelp</HelpText>
+			<Label>@BDR:DisableErEmail</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AllCompanies</Name>
+			<HelpText>@BDR:RowAllCompaniesHelp</HelpText>
+			<Label>@BDR:AllCompanies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentAddressIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>TestAddress</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>

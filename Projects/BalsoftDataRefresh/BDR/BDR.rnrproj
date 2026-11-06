@@ -195,6 +195,21 @@
       <Name>BDRTaskTypeCancelWorkflows</Name>
       <Link>Classes\BDRTaskTypeCancelWorkflows</Link>
     </Content>
+    <Content Include="AxClass\BDRMaskEmail">
+      <SubType>Content</SubType>
+      <Name>BDRMaskEmail</Name>
+      <Link>Classes\BDRMaskEmail</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypeMaskEmails">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypeMaskEmails</Name>
+      <Link>Classes\BDRTaskTypeMaskEmails</Link>
+    </Content>
+    <Content Include="AxClass\BDRTaskTypePrintDestinations">
+      <SubType>Content</SubType>
+      <Name>BDRTaskTypePrintDestinations</Name>
+      <Link>Classes\BDRTaskTypePrintDestinations</Link>
+    </Content>
     <Content Include="AxClass\BDRTaskTypeDataCleanup">
       <SubType>Content</SubType>
       <Name>BDRTaskTypeDataCleanup</Name>
@@ -294,6 +309,16 @@
       <SubType>Content</SubType>
       <Name>BDRWorkflowCancel</Name>
       <Link>Display Menu Items\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRMaskEmailRule">
+      <SubType>Content</SubType>
+      <Name>BDRMaskEmailRule</Name>
+      <Link>Display Menu Items\BDRMaskEmailRule</Link>
+    </Content>
+    <Content Include="AxMenuItemDisplay\BDRPrintDestinationRule">
+      <SubType>Content</SubType>
+      <Name>BDRPrintDestinationRule</Name>
+      <Link>Display Menu Items\BDRPrintDestinationRule</Link>
     </Content>
     <Content Include="AxMenuItemDisplay\BDRWorkspace">
       <SubType>Content</SubType>
@@ -439,6 +464,16 @@
       <SubType>Content</SubType>
       <Name>BDRWorkflowCancel</Name>
       <Link>Forms\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxForm\BDRMaskEmailRule">
+      <SubType>Content</SubType>
+      <Name>BDRMaskEmailRule</Name>
+      <Link>Forms\BDRMaskEmailRule</Link>
+    </Content>
+    <Content Include="AxForm\BDRPrintDestinationRule">
+      <SubType>Content</SubType>
+      <Name>BDRPrintDestinationRule</Name>
+      <Link>Forms\BDRPrintDestinationRule</Link>
     </Content>
     <Content Include="AxForm\BDRWorkspace">
       <SubType>Content</SubType>
@@ -594,6 +629,21 @@
       <SubType>Content</SubType>
       <Name>BDRWorkflowCancel</Name>
       <Link>Tables\BDRWorkflowCancel</Link>
+    </Content>
+    <Content Include="AxTable\BDRMaskEmailRule">
+      <SubType>Content</SubType>
+      <Name>BDRMaskEmailRule</Name>
+      <Link>Tables\BDRMaskEmailRule</Link>
+    </Content>
+    <Content Include="AxTable\BDRPrintDestinationRule">
+      <SubType>Content</SubType>
+      <Name>BDRPrintDestinationRule</Name>
+      <Link>Tables\BDRPrintDestinationRule</Link>
+    </Content>
+    <Content Include="AxTable\BDRMaskTmp">
+      <SubType>Content</SubType>
+      <Name>BDRMaskTmp</Name>
+      <Link>Tables\BDRMaskTmp</Link>
     </Content>
     <Content Include="AxTile\BDRWorkspace">
       <SubType>Content</SubType>

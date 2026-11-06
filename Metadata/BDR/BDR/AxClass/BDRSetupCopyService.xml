@@ -45,6 +45,8 @@ public final class BDRSetupCopyService extends SysOperationServiceBase
         this.copyTable(tableNum(BDRUserRole));
         this.copyTable(tableNum(BDRBatchJob));
         this.copyTable(tableNum(BDRWorkflowCancel));
+        this.copyTable(tableNum(BDRMaskEmailRule));
+        this.copyTable(tableNum(BDRPrintDestinationRule));
         this.copyTable(tableNum(BDRFieldValue));
         this.copyTable(tableNum(BDREndpoint));
         this.copyTable(tableNum(BDREndpointEvent));

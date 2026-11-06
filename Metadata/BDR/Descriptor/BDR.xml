@@ -16,14 +16,17 @@
 		<d2p1:string>ApplicationFoundation</d2p1:string>
 		<d2p1:string>ApplicationPlatform</d2p1:string>
 		<d2p1:string>ApplicationSuite</d2p1:string>
+		<d2p1:string>ContactPerson</d2p1:string>
 		<d2p1:string>Directory</d2p1:string>
+		<d2p1:string>ElectronicReporting</d2p1:string>
 		<d2p1:string>MonitoringandTelemetry</d2p1:string>
+		<d2p1:string>PersonnelCore</d2p1:string>
 	</ModuleReferences>
 	<Name>BDR</Name>
 	<Publisher>Balsoft GmbH</Publisher>
 	<SolutionId>00000000-0000-0000-0000-000000000000</SolutionId>
-	<VersionBuild>2</VersionBuild>
+	<VersionBuild>0</VersionBuild>
 	<VersionMajor>1</VersionMajor>
-	<VersionMinor>0</VersionMinor>
+	<VersionMinor>1</VersionMinor>
 	<VersionRevision>0</VersionRevision>
 </AxModelInfo>

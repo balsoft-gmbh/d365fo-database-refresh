@@ -255,6 +255,12 @@ public class BDRSetupCompany extends common
             case tableNum(BDRWorkflowCancel):
                 BDRWorkflowCancel workflowCancel = _row;
                 return strFmt('%1, %2', workflowCancel.EnvironmentId, workflowCancel.ConfigurationName ? workflowCancel.ConfigurationName : "@BDR:AllWorkflows");
+            case tableNum(BDRMaskEmailRule):
+                BDRMaskEmailRule maskEmailRule = _row;
+                return strFmt('%1, %2', maskEmailRule.EnvironmentId, maskEmailRule.TestAddress);
+            case tableNum(BDRPrintDestinationRule):
+                BDRPrintDestinationRule printDestinationRule = _row;
+                return strFmt('%1, %2', printDestinationRule.EnvironmentId, printDestinationRule.TestAddress);
         }
 
         return '';

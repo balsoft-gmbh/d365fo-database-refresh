@@ -182,6 +182,18 @@ public class BDREnvironment extends common
 			<Table>BDRWorkflowCancel</Table>
 		</AxTableDeleteAction>
 		<AxTableDeleteAction>
+			<Name>BDRMaskEmailRule</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRMaskEmailRule</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
+			<Name>BDRPrintDestinationRule</Name>
+			<DeleteAction>Cascade</DeleteAction>
+			<Relation>Environment</Relation>
+			<Table>BDRPrintDestinationRule</Table>
+		</AxTableDeleteAction>
+		<AxTableDeleteAction>
 			<Name>BDRBatchJob</Name>
 			<DeleteAction>Cascade</DeleteAction>
 			<Relation>Environment</Relation>

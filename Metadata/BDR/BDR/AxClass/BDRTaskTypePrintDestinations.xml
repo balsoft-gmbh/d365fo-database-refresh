@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRTaskTypePrintDestinations</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.ComponentModel.Composition;
+
+/// <summary>
+/// Sends document mails of the copy to the test address: print management e-mail destinations
+/// get the test address instead of literal addresses, and the e-mail destination of electronic
+/// reporting formats is turned off, because its recipients cannot be changed from outside ER.
+/// </summary>
+[ExportAttribute(identifierStr(Dynamics.AX.Application.BDRITaskType))]
+[ExportMetadata(classStr(BDRITaskType), 'PrintDestinations')]
+public final class BDRTaskTypePrintDestinations implements BDRITaskType
+{
+    public const BDRTaskTypeName Name = 'PrintDestinations';
+    // ERFormatDestinationEmailSettings is internal to ElectronicReporting; this is its settings key.
+    private const str EmailSettingsKey = 'ERFormatDestinationEmailSettings';
+
+    BDRTaskContext context;
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>registration</Name>
+				<Source><![CDATA[
+    public BDRTaskTypeRegistrationItem registration()
+    {
+        return BDRTaskTypeRegistrationItem::construct(BDRTaskTypePrintDestinations::Name, literalStr("@BDR:TaskPrintDestinations"), 46, false, menuItemDisplayStr(BDRPrintDestinationRule));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run(BDRTaskContext _context)
+    {
+        BDRPrintDestinationRule rule;
+
+        context = _context;
+
+        while select rule
+            order by RecId
+            where rule.EnvironmentId == context.environmentId()
+        {
+            Set companies = rule.companies();
+
+            if (!companies.elements())
+            {
+                context.logWarning(strFmt("@BDR:MsgNoCompaniesSkipped", rule.TestAddress));
+                continue;
+            }
+
+            SetEnumerator enumerator = companies.getEnumerator();
+
+            while (enumerator.moveNext())
+            {
+                changecompany(enumerator.current())
+                {
+                    if (rule.PrintManagement)
+                    {
+                        this.redirectPrintManagement(rule);
+                    }
+
+                    if (rule.ElectronicReporting)
+                    {
+                        this.disableElectronicReportingEmail();
+                    }
+                }
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>redirectPrintManagement</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Points the print management settings of the current company with destination e-mail to the test address.
+    /// </summary>
+    private void redirectPrintManagement(BDRPrintDestinationRule _rule)
+    {
+        PrintMgmtSettings printMgmtSettings;
+        BDRRecordsAffected updated;
+
+        ttsbegin;
+
+        printMgmtSettings.skipDatabaseLog(true);
+        printMgmtSettings.skipEvents(true);
+
+        while select forupdate printMgmtSettings
+        {
+            if (printMgmtSettings.PrintJobSettings == conNull())
+            {
+                continue;
+            }
+
+            SRSPrintDestinationSettings destination = new SRSPrintDestinationSettings(printMgmtSettings.PrintJobSettings);
+
+            if (destination.printMediumType() != SRSPrintMediumType::Email)
+            {
+                continue;
+            }
+
+            str emailTo = BDRMaskEmail::redirectRecipients(destination.emailTo(), _rule.TestAddress);
+            str emailCc = BDRMaskEmail::redirectRecipients(destination.emailCc(), _rule.TestAddress);
+
+            if (!emailTo)
+            {
+                emailTo = _rule.TestAddress;
+            }
+
+            if (emailTo != destination.emailTo() || emailCc != destination.emailCc())
+            {
+                destination.emailTo(emailTo);
+                destination.emailCc(emailCc);
+                printMgmtSettings.PrintJobSettings = destination.pack();
+                printMgmtSettings.doUpdate();
+                updated++;
+            }
+        }
+
+        ttscommit;
+
+        if (updated)
+        {
+            context.addRecordsAffected(updated);
+            context.logInfo(strFmt("@BDR:MsgPrintDestinationsRedirected", updated, curExt()));
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>disableElectronicReportingEmail</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Turns off the e-mail destination of every electronic reporting file destination of the
+    /// current company; the other destinations of the same file stay as they are.
+    /// </summary>
+    private void disableElectronicReportingEmail()
+    {
+        ERFormatFileDestinationTable fileDestination;
+        BDRRecordsAffected updated;
+
+        ttsbegin;
+
+        while select forupdate fileDestination
+        {
+            ERFormatDestinationSettings settings = fileDestination.getSettings();
+
+            if (!settings || !settings.isEmailEnabled())
+            {
+                continue;
+            }
+
+            ERIFormatFileDestinationSettings emailSettings = settings.getSettingsByKey(EmailSettingsKey);
+
+            if (emailSettings)
+            {
+                emailSettings.setEnabled(false);
+                fileDestination.saveSettings(settings);
+                fileDestination.update();
+                updated++;
+            }
+        }
+
+        ttscommit;
+
+        if (updated)
+        {
+            context.addRecordsAffected(updated);
+            context.logInfo(strFmt("@BDR:MsgErEmailDisabled", updated, curExt()));
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -20,6 +20,8 @@ System administration > Workspaces.
 | Assign security roles | Assigns roles per environment, by AOT name | Roles copied from the source |
 | Cancel pending workflows | Cancels the pending workflow instances of the listed workflows (or all) in all or in selected companies | Instances stay pending |
 | Set field values | Writes any value into any table field per environment, in all or in selected companies (URLs, e-mail settings including the SMTP password, integration settings) | Manual or data package |
+| Mask customer and vendor e-mails | Replaces the e-mail addresses of customers, vendors and their contact persons (and the copies on sales orders, quotations and purchase orders) with a test address | Real addresses stay |
+| Redirect print destinations | Sends print management e-mail destinations to a test address and turns off the e-mail destination of electronic reporting formats | Documents mailed to real recipients |
 | Create business event endpoints | Creates endpoints of every Azure type and activates their business events | Endpoints removed |
 | Release batch jobs | Puts the listed batch jobs back to Waiting | All batch jobs on hold |
 | Clean up data | Deletes records older than N days per table, or empties a table, in all or in selected companies | Transactionless copy (PPAC only, all transactions) |
@@ -131,6 +133,33 @@ enum or encrypted (also for a row with a pipeline secret), and Value to write an
 fit their field types. An enum takes its name or number; an empty value is only valid for a field that accepts it.
 A row that still fails during a refresh, for example because a secret is missing or its value
 does not fit an enum field, fails the task, and the other rows are still written.
+
+### E-mail masking
+
+One row per test address with **Customers**, **Vendors**, **Contact persons** and **Order e-mails**,
+for all or for selected companies. Every e-mail address of these parties becomes the test address
+with the record ID as plus part, so `test@contoso.com` turns an address into
+`test+5637144576@contoso.com`: all mail lands in one inbox and can be traced back to the address it
+replaced. Order e-mails also masks the e-mail that sales orders, sales quotations and purchase
+orders copied when they were created (`test+SalesTable-5637144576@contoso.com`).
+
+Addresses on a location that a worker, a user or a legal entity also uses are kept, so workflow
+notifications and internal mails still arrive. Workflow notifications are not affected anyway,
+because D365 sends them to the e-mail of the user record. Running the task again changes nothing
+that is already masked. The test address must be short enough for the longest masked value: 80
+characters with Order e-mails, 255 without.
+
+Not covered: the user's own print settings, and other tables that keep a copy of an address
+(payment, bank and retail tables, for example).
+
+### Print destinations
+
+One row per test address with **Print management** and **Electronic reporting e-mail**, for all
+or for selected companies. Print management settings with the destination E-mail keep it, but
+every typed address in To and Cc becomes the test address. Purpose tokens such as `@Business@`
+stay; they resolve to the masked addresses of E-mail masking when a document is printed.
+Electronic reporting formats cannot be redirected from outside ER, so their e-mail destination is
+turned off; archive, file, screen and printer destinations of the same file stay as they are.
 
 ### Data cleanup
 

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRMaskEmail</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// Builds the masked e-mail addresses and the redirected print destination recipients
+/// from the test address of a rule.
+/// </summary>
+public final class BDRMaskEmail
+{
+    // The longest tag a masked value gets: an order copy of a sales quotation with the largest RecId.
+    private const str LongestTag = 'SalesQuotationTable-9223372036854775807';
+    private const str AddressSeparator = ';';
+    private const str TokenDelimiter = '@';
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>maskedAddress</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// The test address with a tag as plus part, for example test+5637144576@contoso.com.
+    /// </summary>
+    /// <param name = "_testAddress">The test address of the rule.</param>
+    /// <param name = "_tag">The tag that identifies the masked record.</param>
+    /// <returns>The masked address.</returns>
+    public static str maskedAddress(Email _testAddress, str _tag)
+    {
+        int atPosition = strScan(_testAddress, TokenDelimiter, 1, strLen(_testAddress));
+
+        return strFmt('%1+%2@%3', subStr(_testAddress, 1, atPosition - 1), _tag, subStr(_testAddress, atPosition + 1, strLen(_testAddress)));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isValidTestAddress</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Checks that a test address has one @, a local part and a domain with a dot, no separator,
+    /// and that the longest masked value still fits the field.
+    /// </summary>
+    /// <param name = "_testAddress">The test address.</param>
+    /// <param name = "_maxLength">The length of the shortest field the masked value goes into.</param>
+    /// <returns>True if the address can be used.</returns>
+    public static boolean isValidTestAddress(Email _testAddress, int _maxLength)
+    {
+        int length = strLen(_testAddress);
+
+        if (length - strLen(strRem(_testAddress, TokenDelimiter)) != 1
+            || strFind(_testAddress, '; ,', 1, length))
+        {
+            return false;
+        }
+
+        int atPosition = strScan(_testAddress, TokenDelimiter, 1, length);
+        str domain = subStr(_testAddress, atPosition + 1, length);
+
+        if (atPosition == 1 || !domain || !strScan(domain, '.', 1, strLen(domain)))
+        {
+            return false;
+        }
+
+        return strLen(BDRMaskEmail::maskedAddress(_testAddress, LongestTag)) <= _maxLength;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>redirectRecipients</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Replaces every literal address of a print destination by the test address and keeps the
+    /// purpose tokens such as @Business@, which resolve to the masked addresses at print time.
+    /// </summary>
+    /// <param name = "_recipients">Addresses and tokens separated by semicolons.</param>
+    /// <param name = "_testAddress">The test address.</param>
+    /// <returns>The recipients without duplicates; empty if there were none.</returns>
+    public static str redirectRecipients(str _recipients, Email _testAddress)
+    {
+        List parts = strSplit(_recipients, AddressSeparator);
+        ListEnumerator enumerator = parts.getEnumerator();
+        Set added = new Set(Types::String);
+        str result;
+
+        while (enumerator.moveNext())
+        {
+            str part = strLRTrim(enumerator.current());
+
+            if (!part)
+            {
+                continue;
+            }
+
+            str value = BDRMaskEmail::isToken(part) ? part : _testAddress;
+
+            if (!added.in(value))
+            {
+                added.add(value);
+                result += (result ? AddressSeparator : '') + value;
+            }
+        }
+
+        return result;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isToken</Name>
+				<Source><![CDATA[
+    private static boolean isToken(str _part)
+    {
+        int length = strLen(_part);
+
+        return length >= 2
+            && subStr(_part, 1, 1) == TokenDelimiter
+            && subStr(_part, length, 1) == TokenDelimiter;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyContainer</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// The companies of a set as a container for a cross company select.
+    /// </summary>
+    /// <param name = "_companies">A set of company IDs.</param>
+    /// <returns>The company IDs as a container.</returns>
+    public static container companyContainer(Set _companies)
+    {
+        container companies;
+        SetEnumerator enumerator = _companies.getEnumerator();
+
+        while (enumerator.moveNext())
+        {
+            companies += enumerator.current();
+        }
+
+        return companies;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

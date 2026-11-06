@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BDRMaskEmailRule</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// E-mail masking of an environment: the test address that replaces the e-mail addresses of
+/// customers, vendors and their contact persons in all or in the selected companies.
+/// </summary>
+public class BDRMaskEmailRule extends common
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>initValue</Name>
+				<Source><![CDATA[
+
+    public void initValue()
+    {
+        super();
+
+        this.AllCompanies = NoYes::Yes;
+        this.Customers = NoYes::Yes;
+        this.Vendors = NoYes::Yes;
+        this.ContactPersons = NoYes::Yes;
+        this.OrderCopies = NoYes::Yes;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>validateWrite</Name>
+				<Source><![CDATA[
+
+    public boolean validateWrite()
+    {
+        boolean ret = super();
+
+        // Order copies go into fields of 80 characters, addresses into 255.
+        if (!BDRMaskEmail::isValidTestAddress(this.TestAddress, this.OrderCopies ? 80 : 255))
+        {
+            ret = checkFailed(strFmt("@BDR:ErrInvalidTestAddress", this.TestAddress)) && ret;
+        }
+
+        if (!this.Customers && !this.Vendors && !this.ContactPersons)
+        {
+            ret = checkFailed("@BDR:ErrMaskNothingSelected") && ret;
+        }
+
+        return ret;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>update</Name>
+				<Source><![CDATA[
+
+    public void update()
+    {
+        super();
+
+        // All companies replaces the list of selected companies.
+        if (this.AllCompanies)
+        {
+            BDRSetupCompany::deleteFor(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>delete</Name>
+				<Source><![CDATA[
+
+    public void delete()
+    {
+        super();
+
+        BDRSetupCompany::deleteFor(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The companies this row applies to.
+    /// </summary>
+    /// <returns>A set of company IDs.</returns>
+    public Set companies()
+    {
+        return BDRSetupCompany::companies(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>companyScope</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// The selected companies; empty when the row is for all companies.
+    /// </summary>
+    public display Description companyScope()
+    {
+        return BDRSetupCompany::scope(this);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>canChooseCompanies</Name>
+				<Source><![CDATA[
+
+    /// <summary>
+    /// Customers, vendors, orders and print settings belong to a company, so companies can always be chosen.
+    /// </summary>
+    public boolean canChooseCompanies()
+    {
+        return true;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+	<DeveloperDocumentation>@BDR:MaskEmailRules</DeveloperDocumentation>
+	<Label>@BDR:MaskEmailRules</Label>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TitleField1>TestAddress</TitleField1>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<TableGroup>Group</TableGroup>
+	<ReplacementKey>EnvironmentAddressIdx</ReplacementKey>
+	<ClusteredIndex>EnvironmentAddressIdx</ClusteredIndex>
+	<ModifiedBy>Yes</ModifiedBy>
+	<ModifiedDateTime>Yes</ModifiedDateTime>
+	<PrimaryIndex>EnvironmentAddressIdx</PrimaryIndex>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>TestAddress</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Customers</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Vendors</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ContactPersons</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>OrderCopies</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>Overview</Name>
+			<Label>@SYS9039</Label>
+			<Fields>
+				<AxTableFieldGroupField>
+					<DataField>TestAddress</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Customers</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>Vendors</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>ContactPersons</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>OrderCopies</DataField>
+				</AxTableFieldGroupField>
+				<AxTableFieldGroupField>
+					<DataField>AllCompanies</DataField>
+				</AxTableFieldGroupField>
+			</Fields>
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EnvironmentId</Name>
+			<ExtendedDataType>BDREnvironmentId</ExtendedDataType>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>TestAddress</Name>
+			<ExtendedDataType>Email</ExtendedDataType>
+			<HelpText>@BDR:TestAddressHelp</HelpText>
+			<Label>@BDR:TestAddress</Label>
+			<Mandatory>Yes</Mandatory>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>Customers</Name>
+			<HelpText>@BDR:MaskCustomersHelp</HelpText>
+			<Label>@BDR:MaskCustomers</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>Vendors</Name>
+			<HelpText>@BDR:MaskVendorsHelp</HelpText>
+			<Label>@BDR:MaskVendors</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>ContactPersons</Name>
+			<HelpText>@BDR:MaskContactPersonsHelp</HelpText>
+			<Label>@BDR:MaskContactPersons</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>OrderCopies</Name>
+			<HelpText>@BDR:MaskOrderCopiesHelp</HelpText>
+			<Label>@BDR:MaskOrderCopies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AllCompanies</Name>
+			<HelpText>@BDR:RowAllCompaniesHelp</HelpText>
+			<Label>@BDR:AllCompanies</Label>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>EnvironmentAddressIdx</Name>
+			<AlternateKey>Yes</AlternateKey>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EnvironmentId</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>TestAddress</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations>
+		<AxTableRelation>
+			<Name>Environment</Name>
+			<Cardinality>ZeroMore</Cardinality>
+			<RelatedTable>BDREnvironment</RelatedTable>
+			<RelatedTableCardinality>ExactlyOne</RelatedTableCardinality>
+			<RelationshipType>Composition</RelationshipType>
+			<Constraints>
+				<AxTableRelationConstraint xmlns=""
+					i:type="AxTableRelationConstraintField">
+					<Name>EnvironmentId</Name>
+					<Field>EnvironmentId</Field>
+					<RelatedField>EnvironmentId</RelatedField>
+				</AxTableRelationConstraint>
+			</Constraints>
+		</AxTableRelation>
+	</Relations>
+	<StateMachines />
+</AxTable>
